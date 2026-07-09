@@ -162,4 +162,16 @@ class LocalStore {
   Future<void> saveThemeMode(String mode) =>
       _prefs.setString(_themeModeKey, mode);
   String? loadThemeMode() => _prefs.getString(_themeModeKey);
+
+  Future<void> saveHomeLocation(double lat, double lon) async {
+    await _prefs.setDouble('home_lat', lat);
+    await _prefs.setDouble('home_lon', lon);
+  }
+
+  ({double lat, double lon})? loadHomeLocation() {
+    final lat = _prefs.getDouble('home_lat');
+    final lon = _prefs.getDouble('home_lon');
+    if (lat == null || lon == null) return null;
+    return (lat: lat, lon: lon);
+  }
 }

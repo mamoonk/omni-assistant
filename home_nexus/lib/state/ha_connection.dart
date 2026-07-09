@@ -162,6 +162,10 @@ final localStoreProvider = FutureProvider<LocalStore>((ref) async =>
 /// Persisted appearance setting (§7 polish).
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
+/// Home coordinates for sun-based automations.
+final homeLocationProvider =
+    StateProvider<({double lat, double lon})?>((ref) => null);
+
 /// Routes each command to the adapter that owns the device's origin.
 /// Mock/demo devices always mutate locally.
 class RoutingController implements DeviceController {
@@ -206,6 +210,10 @@ final controllerProvider = Provider<DeviceController>((ref) {
 final bootstrapProvider = FutureProvider<void>((ref) async {
   final store = await ref.watch(localStoreProvider.future);
 
+  final location = store.loadHomeLocation();
+  if (location != null) {
+    ref.read(homeLocationProvider.notifier).state = location;
+  }
   final themeMode = store.loadThemeMode();
   if (themeMode != null) {
     ref.read(themeModeProvider.notifier).state =

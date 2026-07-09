@@ -38,7 +38,9 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.text('Nexus Bridge'), findsOneWidget);
 
-    // first section is the bridge; empty host -> validation error
+    // first connectable section is the bridge; empty host -> validation error
+    await tester.ensureVisible(find.text('Connect').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Connect').first);
     await tester.pumpAndSettle();
     expect(find.text('Host required'), findsOneWidget);

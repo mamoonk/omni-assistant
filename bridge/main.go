@@ -110,7 +110,13 @@ func main() {
 	defer stop()
 
 	if !*noMdns {
-		shutdown, err := discovery.Advertise(*name, *port, server.Version)
+		instanceID, _ := st.Config("instance_id")
+		if instanceID == "" {
+			instanceID = generateToken()
+			_ = st.SetConfig("instance_id", instanceID)
+		}
+		shutdown, err := discovery.Advertise(
+			*name, *port, server.Version, instanceID, srv.Token != "")
 		if err != nil {
 			log.Printf("mdns disabled: %v", err)
 		} else {

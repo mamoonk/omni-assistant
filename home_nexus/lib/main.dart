@@ -22,6 +22,7 @@ import 'widgets/device_card.dart';
 import 'widgets/energy_view.dart';
 import 'widgets/new_tab_dialog.dart';
 import 'widgets/scene_bar.dart';
+import 'widgets/voice_sheet.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -148,6 +149,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final kiosk = ref.watch(kioskProvider);
     final actions = <Widget>[
       const _ConnectionIndicator(),
+      AmbientIconButton(
+        icon: Icons.mic_none,
+        tooltip: 'Voice / command',
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => const VoiceSheet(),
+        ),
+      ),
       AmbientIconButton(
         icon: kiosk ? Icons.fullscreen_exit : Icons.fullscreen,
         tooltip: kiosk ? 'Exit display mode' : 'Display mode',

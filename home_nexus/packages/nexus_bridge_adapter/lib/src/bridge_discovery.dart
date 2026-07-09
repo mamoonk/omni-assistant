@@ -6,8 +6,17 @@ class DiscoveredBridge {
   final String name;
   final String host;
   final int port;
-  const DiscoveredBridge(
-      {required this.name, required this.host, required this.port});
+  final String version;
+  final bool authRequired;
+  final String instanceId;
+  const DiscoveredBridge({
+    required this.name,
+    required this.host,
+    required this.port,
+    this.version = '?',
+    this.authRequired = true, // safe default: assume a token is needed
+    this.instanceId = '',
+  });
 }
 
 /// mDNS scan for bridges advertising `_nexus-bridge._tcp`. Best-effort:
@@ -23,6 +32,32 @@ Future<List<DiscoveredBridge>> discoverBridges(
         .lookup<PtrResourceRecord>(
             ResourceRecordQuery.serverPointer(_serviceType))
         .timeout(timeout, onTimeout: (sink) => sink.close())) {
+      // TXT: version / auth / id — lets the UI say whether a pairing
+      // token is needed before the user even connects
+      var version = '?';
+      var authRequired = true;
+      var instanceId = '';
+      await for (final txt in client
+          .lookup<TxtResourceRecord>(
+              ResourceRecordQuery.text(ptr.domainName))
+          .timeout(const Duration(seconds: 2),
+              onTimeout: (sink) => sink.close())) {
+        for (final line in txt.text.split('\n')) {
+          final eq = line.indexOf('=');
+          if (eq <= 0) continue;
+          final key = line.substring(0, eq);
+          final value = line.substring(eq + 1).trim();
+          switch (key) {
+            case 'version':
+              version = value;
+            case 'auth':
+              authRequired = value != 'open';
+            case 'id':
+              instanceId = value;
+          }
+        }
+      }
+
       await for (final srv in client
           .lookup<SrvResourceRecord>(
               ResourceRecordQuery.service(ptr.domainName))
@@ -41,8 +76,14 @@ Future<List<DiscoveredBridge>> discoverBridges(
         final name = ptr.domainName
             .replaceAll('.$_serviceType', '')
             .replaceAll('._nexus-bridge._tcp.local', '');
-        found['$host:${srv.port}'] =
-            DiscoveredBridge(name: name, host: host, port: srv.port);
+        found['$host:${srv.port}'] = DiscoveredBridge(
+          name: name,
+          host: host,
+          port: srv.port,
+          version: version,
+          authRequired: authRequired,
+          instanceId: instanceId,
+        );
       }
     }
   } catch (_) {

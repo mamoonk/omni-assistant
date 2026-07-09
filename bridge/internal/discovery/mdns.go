@@ -9,13 +9,24 @@ import (
 const ServiceType = "_nexus-bridge._tcp"
 
 // Advertise registers the service; call the returned shutdown func on exit.
-func Advertise(name string, port int, version string) (func(), error) {
+// TXT carries version, whether pairing auth is required, and a stable
+// instance id so the app can identify a bridge before connecting.
+func Advertise(name string, port int, version, instanceID string, authRequired bool) (func(), error) {
+	auth := "open"
+	if authRequired {
+		auth = "required"
+	}
 	server, err := zeroconf.Register(
 		name,
 		ServiceType,
 		"local.",
 		port,
-		[]string{"version=" + version, "path=/ws"},
+		[]string{
+			"version=" + version,
+			"path=/ws",
+			"auth=" + auth,
+			"id=" + instanceID,
+		},
 		nil,
 	)
 	if err != nil {

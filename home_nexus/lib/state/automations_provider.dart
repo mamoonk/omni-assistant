@@ -5,10 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
+import '../services/solar.dart';
 import 'bridge_connection.dart';
 import 'device_providers.dart';
 import 'ha_connection.dart'
-    show HaStatus, controllerProvider, localStoreProvider;
+    show HaStatus, controllerProvider, homeLocationProvider, localStoreProvider;
 import 'scenes_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ sealed class Trigger {
       switch (json['type']) {
         'device' => DeviceTrigger.fromJson(json),
         'time' => TimeTrigger.fromJson(json),
+        'sun' => SunTrigger.fromJson(json),
         _ => throw ArgumentError('unknown trigger ${json['type']}'),
       };
 }
@@ -85,6 +87,23 @@ class TimeTrigger extends Trigger {
 
   factory TimeTrigger.fromJson(Map<String, dynamic> json) => TimeTrigger(
       hour: json['hour'] as int, minute: json['minute'] as int);
+}
+
+/// Fires at sunrise/sunset (± offset) computed from the home location.
+class SunTrigger extends Trigger {
+  final String event; // 'sunrise' | 'sunset'
+  final int offsetMinutes; // negative = before
+
+  const SunTrigger({required this.event, this.offsetMinutes = 0});
+
+  @override
+  Map<String, dynamic> toJson() =>
+      {'type': 'sun', 'event': event, 'offset': offsetMinutes};
+
+  factory SunTrigger.fromJson(Map<String, dynamic> json) => SunTrigger(
+        event: json['event'] as String,
+        offsetMinutes: json['offset'] as int? ?? 0,
+      );
 }
 
 /// AND-ed conditions. Currently: time-of-day window.
@@ -263,6 +282,8 @@ bool isBridgeRunnable(
       !_isBridgeDevice(trigger.deviceId, devices)) {
     return false;
   }
+  // sun triggers need the home location, which only the app has
+  if (trigger is SunTrigger) return false;
   final flat = _flattenActions(automation, scenes);
   if (flat == null || flat.isEmpty) return false;
   return flat.every((a) => _isBridgeDevice(a.deviceId, devices));
@@ -385,13 +406,26 @@ class AutomationEngine {
     for (final automation in _ref.read(automationsProvider)) {
       if (!automation.enabled || _bridgeHandles(automation)) continue;
       final trigger = automation.trigger;
-      if (trigger is TimeTrigger &&
-          trigger.hour == now.hour &&
-          trigger.minute == now.minute &&
-          _conditionHolds(automation, now)) {
+      final fires = switch (trigger) {
+        TimeTrigger t => t.hour == now.hour && t.minute == now.minute,
+        SunTrigger t => _sunMinute(t, now) == now.hour * 60 + now.minute,
+        _ => false,
+      };
+      if (fires && _conditionHolds(automation, now)) {
         _runActions(automation);
       }
     }
+  }
+
+  /// Target minute-of-day for a sun trigger today, or null without a
+  /// configured home location (trigger simply never fires).
+  int? _sunMinute(SunTrigger trigger, DateTime now) {
+    final location = _ref.read(homeLocationProvider);
+    if (location == null) return null;
+    final times = solarTimes(now, location.lat, location.lon);
+    if (times == null) return null; // polar day/night
+    final base = trigger.event == 'sunrise' ? times.sunrise : times.sunset;
+    return ((base + trigger.offsetMinutes) % 1440 + 1440) % 1440;
   }
 
   /// True when the bridge is connected and runs this rule itself —

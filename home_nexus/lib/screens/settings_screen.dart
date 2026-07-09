@@ -20,6 +20,8 @@ class SettingsScreen extends ConsumerWidget {
         children: const [
           _AppearanceSection(),
           SizedBox(height: 24),
+          _LocationSection(),
+          SizedBox(height: 24),
           _BridgeSection(),
           SizedBox(height: 24),
           _HaSection(),
@@ -67,6 +69,93 @@ class _AppearanceSection extends ConsumerWidget {
             final store = await ref.read(localStoreProvider.future);
             await store.saveThemeMode(s.first.name);
           },
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Home location (sun-based automations)
+// ---------------------------------------------------------------------------
+
+class _LocationSection extends ConsumerStatefulWidget {
+  const _LocationSection();
+
+  @override
+  ConsumerState<_LocationSection> createState() => _LocationSectionState();
+}
+
+class _LocationSectionState extends ConsumerState<_LocationSection> {
+  late final TextEditingController _latCtrl;
+  late final TextEditingController _lonCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final location = ref.read(homeLocationProvider);
+    _latCtrl = TextEditingController(text: location?.lat.toString() ?? '');
+    _lonCtrl = TextEditingController(text: location?.lon.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _latCtrl.dispose();
+    _lonCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final lat = double.tryParse(_latCtrl.text.trim());
+    final lon = double.tryParse(_lonCtrl.text.trim());
+    if (lat == null || lon == null || lat.abs() > 90 || lon.abs() > 180) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter valid coordinates')));
+      return;
+    }
+    ref.read(homeLocationProvider.notifier).state = (lat: lat, lon: lon);
+    final store = await ref.read(localStoreProvider.future);
+    await store.saveHomeLocation(lat, lon);
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Home location saved')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Home location', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 4),
+        Text('Used for sunrise/sunset automations',
+            style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _latCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: const InputDecoration(
+                    labelText: 'Latitude', border: OutlineInputBorder()),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _lonCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
+                decoration: const InputDecoration(
+                    labelText: 'Longitude', border: OutlineInputBorder()),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.tonal(onPressed: _save, child: const Text('Save')),
+          ],
         ),
       ],
     );
@@ -127,8 +216,12 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
       _hostCtrl.text = bridge.host;
       _portCtrl.text = '${bridge.port}';
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Found "${bridge.name}"')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(bridge.authRequired
+          ? 'Found "${bridge.name}" v${bridge.version} — pairing token '
+              'required (see the bridge log)'
+          : 'Found "${bridge.name}" v${bridge.version} — no token needed'),
+    ));
   }
 
   @override

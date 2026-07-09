@@ -4,6 +4,7 @@ import 'package:unification/unification.dart';
 
 import '../state/automations_provider.dart';
 import '../state/device_providers.dart';
+import '../state/ha_connection.dart' show homeLocationProvider;
 import '../state/scenes_provider.dart';
 
 class AutomationsScreen extends ConsumerWidget {
@@ -39,13 +40,21 @@ class AutomationsScreen extends ConsumerWidget {
                     onDismissed: (_) => ref
                         .read(automationsProvider.notifier)
                         .remove(automation.id),
-                    child: SwitchListTile(
+                    child: ListTile(
                       title: Text(automation.name),
                       subtitle: Text(_describe(ref, automation)),
-                      value: automation.enabled,
-                      onChanged: (v) => ref
-                          .read(automationsProvider.notifier)
-                          .toggle(automation.id, v),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AutomationEditorScreen(initial: automation),
+                        ),
+                      ),
+                      trailing: Switch(
+                        value: automation.enabled,
+                        onChanged: (v) => ref
+                            .read(automationsProvider.notifier)
+                            .toggle(automation.id, v),
+                      ),
                     ),
                   ),
               ],
@@ -63,13 +72,19 @@ class AutomationsScreen extends ConsumerWidget {
         'When ${deviceName(t.deviceId)} ${t.capabilityType} ${t.op} ${t.value}',
       TimeTrigger t =>
         'At ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+      SunTrigger t => 'At ${t.event}'
+          '${t.offsetMinutes == 0 ? '' : ' ${t.offsetMinutes > 0 ? '+' : ''}${t.offsetMinutes}m'}',
     };
     return '$when → ${automation.actions.length} action(s)';
   }
 }
 
+enum _TriggerKind { device, time, sun }
+
 class AutomationEditorScreen extends ConsumerStatefulWidget {
-  const AutomationEditorScreen({super.key});
+  /// When set, the editor modifies this automation instead of creating one.
+  final Automation? initial;
+  const AutomationEditorScreen({super.key, this.initial});
 
   @override
   ConsumerState<AutomationEditorScreen> createState() =>
@@ -81,13 +96,15 @@ class _AutomationEditorScreenState
   final _nameCtrl = TextEditingController();
 
   // trigger
-  bool _timeTrigger = false;
+  _TriggerKind _kind = _TriggerKind.device;
   String? _triggerDeviceId;
   String? _triggerCapability;
   String _triggerOp = '==';
   final _triggerValueCtrl = TextEditingController();
   bool _triggerBoolValue = true;
   TimeOfDay _triggerTime = const TimeOfDay(hour: 8, minute: 0);
+  String _sunEvent = 'sunset';
+  final _sunOffsetCtrl = TextEditingController(text: '0');
 
   // condition
   bool _useTimeRange = false;
@@ -98,9 +115,48 @@ class _AutomationEditorScreenState
   final _actions = <AutomationAction>[];
 
   @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial == null) return;
+
+    _nameCtrl.text = initial.name;
+    _actions.addAll(initial.actions);
+    switch (initial.trigger) {
+      case DeviceTrigger t:
+        _kind = _TriggerKind.device;
+        _triggerDeviceId = t.deviceId;
+        _triggerCapability = t.capabilityType;
+        _triggerOp = t.op;
+        if (t.value is bool) {
+          _triggerBoolValue = t.value as bool;
+        } else {
+          _triggerValueCtrl.text = '${t.value}';
+        }
+      case TimeTrigger t:
+        _kind = _TriggerKind.time;
+        _triggerTime = TimeOfDay(hour: t.hour, minute: t.minute);
+      case SunTrigger t:
+        _kind = _TriggerKind.sun;
+        _sunEvent = t.event;
+        _sunOffsetCtrl.text = '${t.offsetMinutes}';
+    }
+    final condition = initial.condition;
+    if (condition != null) {
+      _useTimeRange = true;
+      _rangeStart = TimeOfDay(
+          hour: condition.startMinutes ~/ 60,
+          minute: condition.startMinutes % 60);
+      _rangeEnd = TimeOfDay(
+          hour: condition.endMinutes ~/ 60, minute: condition.endMinutes % 60);
+    }
+  }
+
+  @override
   void dispose() {
     _nameCtrl.dispose();
     _triggerValueCtrl.dispose();
+    _sunOffsetCtrl.dispose();
     super.dispose();
   }
 
@@ -125,28 +181,42 @@ class _AutomationEditorScreenState
     }
 
     final Trigger trigger;
-    if (_timeTrigger) {
-      trigger =
-          TimeTrigger(hour: _triggerTime.hour, minute: _triggerTime.minute);
-    } else {
-      if (_triggerDeviceId == null || _triggerCapability == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pick a trigger device')));
-        return;
-      }
-      trigger = DeviceTrigger(
-        deviceId: _triggerDeviceId!,
-        capabilityType: _triggerCapability!,
-        op: _triggerIsBool ? '==' : _triggerOp,
-        value: _triggerIsBool
-            ? _triggerBoolValue
-            : num.tryParse(_triggerValueCtrl.text) ?? 0,
-      );
+    switch (_kind) {
+      case _TriggerKind.time:
+        trigger =
+            TimeTrigger(hour: _triggerTime.hour, minute: _triggerTime.minute);
+      case _TriggerKind.sun:
+        if (ref.read(homeLocationProvider) == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('Set your home location in Settings first')));
+          return;
+        }
+        trigger = SunTrigger(
+          event: _sunEvent,
+          offsetMinutes: int.tryParse(_sunOffsetCtrl.text) ?? 0,
+        );
+      case _TriggerKind.device:
+        if (_triggerDeviceId == null || _triggerCapability == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Pick a trigger device')));
+          return;
+        }
+        trigger = DeviceTrigger(
+          deviceId: _triggerDeviceId!,
+          capabilityType: _triggerCapability!,
+          op: _triggerIsBool ? '==' : _triggerOp,
+          value: _triggerIsBool
+              ? _triggerBoolValue
+              : num.tryParse(_triggerValueCtrl.text) ?? 0,
+        );
     }
 
     final automation = Automation(
-      id: 'auto_${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.initial?.id ??
+          'auto_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
+      enabled: widget.initial?.enabled ?? true,
       trigger: trigger,
       condition: _useTimeRange
           ? TimeRangeCondition(
@@ -167,7 +237,7 @@ class _AutomationEditorScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New automation'),
+        title: Text(widget.initial == null ? 'New automation' : 'Edit automation'),
         actions: [
           TextButton(onPressed: _save, child: const Text('Save')),
         ],
@@ -182,16 +252,18 @@ class _AutomationEditorScreenState
           ),
           const SizedBox(height: 20),
           Text('When', style: Theme.of(context).textTheme.titleMedium),
-          SegmentedButton<bool>(
+          SegmentedButton<_TriggerKind>(
             segments: const [
-              ButtonSegment(value: false, label: Text('Device state')),
-              ButtonSegment(value: true, label: Text('Time')),
+              ButtonSegment(
+                  value: _TriggerKind.device, label: Text('Device')),
+              ButtonSegment(value: _TriggerKind.time, label: Text('Time')),
+              ButtonSegment(value: _TriggerKind.sun, label: Text('Sun')),
             ],
-            selected: {_timeTrigger},
-            onSelectionChanged: (s) => setState(() => _timeTrigger = s.first),
+            selected: {_kind},
+            onSelectionChanged: (s) => setState(() => _kind = s.first),
           ),
           const SizedBox(height: 12),
-          if (_timeTrigger)
+          if (_kind == _TriggerKind.time)
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('At ${_triggerTime.format(context)}'),
@@ -202,7 +274,48 @@ class _AutomationEditorScreenState
                 if (t != null) setState(() => _triggerTime = t);
               },
             )
-          else ...[
+          else if (_kind == _TriggerKind.sun) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _sunEvent,
+                    decoration: const InputDecoration(
+                        labelText: 'Event', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'sunrise', child: Text('Sunrise')),
+                      DropdownMenuItem(value: 'sunset', child: Text('Sunset')),
+                    ],
+                    onChanged: (v) => setState(() => _sunEvent = v!),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 130,
+                  child: TextField(
+                    controller: _sunOffsetCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Offset (min)',
+                      helperText: '-30 = before',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (ref.watch(homeLocationProvider) == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Requires a home location (Settings → Home location)',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12),
+                ),
+              ),
+          ] else ...[
             DropdownButtonFormField<String>(
               initialValue: _triggerDeviceId,
               decoration: const InputDecoration(

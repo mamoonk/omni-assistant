@@ -39,6 +39,7 @@ dependencies:
   flutter_secure_storage: ^9.2.0
   window_manager: ^0.4.3
   wakelock_plus: ^1.2.8
+  speech_to_text: ^7.0.0
   flutter_staggered_grid_view: ^0.7.0
   mqtt_adapter:
     path: packages/mqtt_adapter
