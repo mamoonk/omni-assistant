@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nexus_bridge_adapter/nexus_bridge_adapter.dart'
+    show DiscoveredBridge, discoverBridges;
 
 import '../services/local_store.dart';
 import '../state/bridge_connection.dart';
@@ -42,6 +44,47 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _hostCtrl;
   late final TextEditingController _portCtrl;
+  bool _scanning = false;
+
+  Future<void> _scan() async {
+    setState(() => _scanning = true);
+    final bridges = await discoverBridges();
+    if (!mounted) return;
+    setState(() => _scanning = false);
+
+    if (bridges.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No bridges found — enter the host manually')));
+      return;
+    }
+    if (bridges.length == 1) {
+      _apply(bridges.single);
+      return;
+    }
+    final choice = await showDialog<DiscoveredBridge>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Bridges found'),
+        children: [
+          for (final b in bridges)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, b),
+              child: Text('${b.name} — ${b.host}:${b.port}'),
+            ),
+        ],
+      ),
+    );
+    if (choice != null) _apply(choice);
+  }
+
+  void _apply(DiscoveredBridge bridge) {
+    setState(() {
+      _hostCtrl.text = bridge.host;
+      _portCtrl.text = '${bridge.port}';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Found "${bridge.name}"')));
+  }
 
   @override
   void initState() {
@@ -78,6 +121,18 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
         const SizedBox(height: 8),
         _StatusBanner(
             status: conn.status, error: conn.error, attempt: conn.attempt),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: _scanning
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.radar),
+          label: Text(_scanning ? 'Searching…' : 'Search network'),
+          onPressed: _scanning ? null : _scan,
+        ),
         const SizedBox(height: 12),
         Form(
           key: _formKey,

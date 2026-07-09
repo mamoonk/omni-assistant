@@ -1,5 +1,6 @@
 // E2E smoke against a live `nexus-bridge -demo` instance:
 //   dart run example/smoke.dart [host] [port]
+// ignore_for_file: avoid_print
 import 'dart:io';
 
 import 'package:nexus_bridge_adapter/nexus_bridge_adapter.dart';

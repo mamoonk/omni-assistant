@@ -10,6 +10,7 @@ dependencies:
   unification:
     path: ../unification
   web_socket_channel: ^3.0.0
+  multicast_dns: ^0.3.2
 
 dev_dependencies:
   lints: ^5.0.0

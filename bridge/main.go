@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 
 	"github.com/mamoonk/omni-assistant/bridge/internal/discovery"
 	"github.com/mamoonk/omni-assistant/bridge/internal/manager"
@@ -25,6 +26,10 @@ func main() {
 	dataDir := flag.String("data", defaultDataDir(), "data directory")
 	demo := flag.Bool("demo", false, "simulate a Zigbee radio (no hardware needed)")
 	noMdns := flag.Bool("no-mdns", false, "disable mDNS advertisement")
+	zigbee := flag.Bool("zigbee", false, "enable the Zigbee2MQTT manager")
+	brokerAddr := flag.String("mqtt-listen", ":1884", "embedded MQTT broker listen address (for zigbee2mqtt)")
+	baseTopic := flag.String("mqtt-base", "zigbee2mqtt", "zigbee2mqtt base topic")
+	z2mCmd := flag.String("z2m-cmd", "", "command to launch zigbee2mqtt, e.g. \"node /opt/zigbee2mqtt/index.js\" (empty = externally managed)")
 	flag.Parse()
 
 	if err := os.MkdirAll(*dataDir, 0o755); err != nil {
@@ -37,16 +42,32 @@ func main() {
 	defer st.Close()
 
 	var managers []manager.RadioManager
-	if *demo {
+	switch {
+	case *demo:
 		dm := manager.NewDemo("bridge0")
 		if saved, err := st.Devices(); err == nil {
 			dm.Seed(saved)
 		}
 		managers = append(managers, dm)
 		log.Print("demo mode: simulated Zigbee radio active")
-	} else {
-		// TODO(phase3): Zigbee2MQTT / Z-Wave JS UI subprocess managers
-		log.Print("no radio managers configured; run with -demo or attach hardware managers")
+	case *zigbee:
+		var cmd []string
+		if *z2mCmd != "" {
+			cmd = strings.Fields(*z2mCmd)
+		}
+		managers = append(managers, manager.NewZ2M(manager.Z2MOptions{
+			ConnectionID: "bridge0",
+			BrokerAddr:   *brokerAddr,
+			BaseTopic:    *baseTopic,
+			Z2MCommand:   cmd,
+		}))
+		log.Printf("zigbee: embedded MQTT broker on %s (base topic %q)",
+			*brokerAddr, *baseTopic)
+		if *z2mCmd == "" {
+			log.Print("zigbee: point your zigbee2mqtt at this broker, or pass -z2m-cmd to have the bridge manage it")
+		}
+	default:
+		log.Print("no radio managers configured; run with -demo or -zigbee")
 	}
 
 	srv := server.New(*name, st, managers...)
