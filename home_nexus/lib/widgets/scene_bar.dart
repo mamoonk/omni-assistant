@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/device_providers.dart';
 import '../state/layout_provider.dart';
 import '../state/scenes_provider.dart';
+import '../theme/ambient.dart';
 
 /// Horizontal scene chips. Tap = activate; in edit mode: add / long-press delete.
 class SceneBar extends ConsumerWidget {
@@ -16,38 +17,36 @@ class SceneBar extends ConsumerWidget {
     if (scenes.isEmpty && !editing) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 52,
+      height: 56,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
           for (final scene in scenes)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: GestureDetector(
+              padding: const EdgeInsets.only(right: 10),
+              child: _RoutinePill(
+                icon: Icons.play_arrow_rounded,
+                label: scene.name,
                 onLongPress: !editing
                     ? null
                     : () => _confirmDelete(context, ref, scene),
-                child: ActionChip(
-                  avatar: const Icon(Icons.play_circle_outline, size: 18),
-                  label: Text(scene.name),
-                  onPressed: () async {
-                    await ref.read(scenesProvider.notifier).activate(scene);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Scene "${scene.name}" activated'),
-                        duration: const Duration(seconds: 1),
-                      ));
-                    }
-                  },
-                ),
+                onTap: () async {
+                  await ref.read(scenesProvider.notifier).activate(scene);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Scene "${scene.name}" activated'),
+                      duration: const Duration(seconds: 1),
+                    ));
+                  }
+                },
               ),
             ),
           if (editing)
-            ActionChip(
-              avatar: const Icon(Icons.add, size: 18),
-              label: const Text('Scene'),
-              onPressed: () => showDialog(
+            _RoutinePill(
+              icon: Icons.add,
+              label: 'Scene',
+              onTap: () => showDialog(
                 context: context,
                 builder: (_) => const NewSceneDialog(),
               ),
@@ -75,6 +74,60 @@ class SceneBar extends ConsumerWidget {
             child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Echo-style frosted routine pill.
+class _RoutinePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _RoutinePill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: Ambient.pill(selected: false),
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Ambient.accent.withValues(alpha: 0.25),
+                  ),
+                  child: Icon(icon, size: 16, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

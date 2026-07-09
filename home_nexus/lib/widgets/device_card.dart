@@ -6,6 +6,7 @@ import '../state/bridge_connection.dart';
 import '../state/ha_connection.dart';
 import '../state/history_provider.dart';
 import '../state/mqtt_connection.dart';
+import '../theme/ambient.dart';
 import 'color_wheel.dart';
 import 'sparkline.dart';
 
@@ -40,14 +41,11 @@ class _CardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: active ? scheme.primaryContainer : scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(14),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      decoration: Ambient.tile(active: active),
+      padding: const EdgeInsets.all(16),
       child: child,
     );
   }
@@ -57,7 +55,13 @@ class _Header extends ConsumerWidget {
   final UniversalDevice device;
   final IconData icon;
   final Widget? trailing;
-  const _Header({required this.device, required this.icon, this.trailing});
+  final bool active;
+  const _Header({
+    required this.device,
+    required this.icon,
+    this.trailing,
+    this.active = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,12 +77,22 @@ class _Header extends ConsumerWidget {
 
     return Row(
       children: [
-        Icon(icon, size: 22),
-        const SizedBox(width: 8),
+        Icon(
+          icon,
+          size: 26,
+          color: active
+              ? Ambient.accent
+              : Colors.white.withValues(alpha: 0.85),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             device.name,
-            style: Theme.of(context).textTheme.titleSmall,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -88,7 +102,7 @@ class _Header extends ConsumerWidget {
             child: Icon(
               Icons.cloud_off,
               size: 16,
-              color: Theme.of(context).colorScheme.outline,
+              color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ?trailing,
@@ -114,6 +128,7 @@ class _SwitchCard extends StatelessWidget {
           _Header(
             device: device,
             icon: Icons.power_settings_new,
+            active: power.on,
             trailing: Switch(
               value: power.on,
               onChanged: (v) => power.executeCommand(controller, device, v),
@@ -148,6 +163,7 @@ class _LightCard extends StatelessWidget {
           _Header(
             device: device,
             icon: Icons.lightbulb,
+            active: on,
             trailing: Switch(
               value: on,
               onChanged: power == null
@@ -231,6 +247,7 @@ class _ClimateCard extends StatelessWidget {
           _Header(
             device: device,
             icon: Icons.thermostat,
+            active: on,
             trailing: power == null
                 ? null
                 : Switch(
@@ -243,23 +260,34 @@ class _ClimateCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.remove_circle_outline),
+                icon: const Icon(Icons.remove_circle_outline, size: 22),
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 36, minHeight: 36),
                 onPressed: !on
                     ? null
                     : () => target.executeCommand(
                         controller, device, target.target - 0.5),
               ),
-              Column(
-                children: [
-                  Text('${target.target}°',
-                      style: Theme.of(context).textTheme.headlineSmall),
-                  if (current?.value != null)
-                    Text('now ${current!.value}${current.unit}',
-                        style: Theme.of(context).textTheme.bodySmall),
-                ],
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    children: [
+                      Text('${target.target}°',
+                          style: Theme.of(context).textTheme.headlineSmall),
+                      if (current?.value != null)
+                        Text('now ${current!.value}${current.unit}',
+                            style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
               ),
               IconButton(
-                icon: const Icon(Icons.add_circle_outline),
+                icon: const Icon(Icons.add_circle_outline, size: 22),
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 36, minHeight: 36),
                 onPressed: !on
                     ? null
                     : () => target.executeCommand(
@@ -295,6 +323,7 @@ class _BinarySensorCard extends StatelessWidget {
           _Header(
             device: device,
             icon: isMotion ? Icons.directions_run : Icons.sensor_door,
+            active: sensor.active,
           ),
           Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ],

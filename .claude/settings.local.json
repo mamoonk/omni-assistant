@@ -4,7 +4,8 @@
       "PowerShell(winget install --id GoLang.Go -e --accept-source-agreements --accept-package-agreements --silent)",
       "PowerShell($env:Path += ';C:\\\\Program Files\\\\Go\\\\bin'; Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\bridge\"; go test ./...; if \\($?\\) { go build -o nexus-bridge.exe . })",
       "PowerShell($env:Path += ';C:\\\\Program Files\\\\Go\\\\bin'; Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\bridge\"; go test ./internal/matter/)",
-      "PowerShell($env:Path += ';C:\\\\Program Files\\\\Go\\\\bin'; Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\bridge\"; gofmt -l -w .; go vet ./...; if \\($?\\) { go test ./... })"
+      "PowerShell($env:Path += ';C:\\\\Program Files\\\\Go\\\\bin'; Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\bridge\"; gofmt -l -w .; go vet ./...; if \\($?\\) { go test ./... })",
+      "PowerShell(Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\home_nexus\"; flutter build windows --debug; if \\($?\\) { Start-Process \".\\\\build\\\\windows\\\\x64\\\\runner\\\\Debug\\\\home_nexus.exe\"; Start-Sleep -Seconds 8; $scratch = \"C:\\\\Users\\\\MAMOON~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--smagents-Digital-Turine-skynet\\\\4e232673-e7a9-437b-80c6-8f1d54da5607\\\\scratchpad\"; Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; $b = New-Object System.Drawing.Bitmap\\([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height\\); $g = [System.Drawing.Graphics]::FromImage\\($b\\); $g.CopyFromScreen\\(0,0,0,0,$b.Size\\); $b.Save\\(\"$scratch\\\\dashboard.png\"\\); $g.Dispose\\(\\); $b.Dispose\\(\\); Write-Output \"saved\" })"
     ]
   }
 }

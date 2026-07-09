@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
 import '../state/device_providers.dart';
+import '../theme/ambient.dart';
 
 /// Energy tab (§7 polish): total live draw + per-device power/energy.
 class EnergyView extends ConsumerWidget {
@@ -19,44 +20,60 @@ class EnergyView extends ConsumerWidget {
           (_power(b) ?? 0).compareTo(_power(a) ?? 0)); // biggest draw first
 
     final totalW = devices.fold<num>(0, (sum, d) => sum + (_power(d) ?? 0));
-    final scheme = Theme.of(context).colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
-        Card(
-          color: scheme.primaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Text('Current draw',
-                    style: Theme.of(context).textTheme.titleMedium),
-                Text(
-                  '${totalW.toStringAsFixed(totalW < 10 ? 1 : 0)} W',
-                  style: Theme.of(context).textTheme.displaySmall,
+        Container(
+          decoration: Ambient.tile(active: true),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Text('Current draw',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75))),
+              Text(
+                '${totalW.toStringAsFixed(totalW < 10 ? 1 : 0)} W',
+                style: const TextStyle(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w200,
+                  color: Colors.white,
                 ),
-                Text('${devices.length} metered device(s)',
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
+              ),
+              Text('${devices.length} metered device(s)',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.55))),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
         for (final device in devices)
-          ListTile(
-            leading: const Icon(Icons.bolt),
-            title: Text(device.name),
-            subtitle: Text(device.roomId),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (_power(device) != null) Text('${_power(device)} W'),
-                if (_energy(device) != null)
-                  Text('${_energy(device)} kWh',
-                      style: Theme.of(context).textTheme.bodySmall),
-              ],
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: Ambient.tile(),
+            child: ListTile(
+              leading: const Icon(Icons.bolt, color: Ambient.accent),
+              title: Text(device.name,
+                  style: const TextStyle(color: Colors.white)),
+              subtitle: Text(device.roomId,
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55))),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (_power(device) != null)
+                    Text('${_power(device)} W',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 16)),
+                  if (_energy(device) != null)
+                    Text('${_energy(device)} kWh',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.6))),
+                ],
+              ),
             ),
           ),
       ],
