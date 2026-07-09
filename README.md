@@ -42,4 +42,17 @@ cd bridge && go test ./...                         # bridge
       (Z-Wave manager pending hardware)
 - [x] Phase 4 — manual IP devices, automation composer, bridge automation
       runtime (rules run 24/7 on the bridge; app engine covers the rest)
-- [ ] Phase 5 — Matter, Thread border router, polish, store launch
+- [x] Phase 5 — Matter commissioning (QR payload parser, simulated
+      controller, chip-tool hook), energy dashboard, theme polish
+- [ ] Hardware-gated backlog — Z-Wave JS UI manager, chip-tool attribute
+      subscriptions, real-radio validation, store submission
+
+## Matter & Thread
+
+The bridge parses Matter QR payloads (`MT:...`) natively and commissions
+via [chip-tool](https://github.com/project-chip/connectedhomeip) when
+started with `-chip-tool /path/to/chip-tool`; without it (or in `-demo`
+mode) commissioning yields a simulated device so the whole flow is
+testable. Thread devices additionally need a border router on the LAN —
+run the [OpenThread Border Router](https://openthread.io/guides/border-router)
+alongside the bridge (an RCP dongle + `otbr-agent` on the same Pi works).

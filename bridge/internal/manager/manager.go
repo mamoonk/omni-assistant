@@ -25,3 +25,9 @@ type RadioManager interface {
 	// Events emits joins, interviews, and state changes.
 	Events() <-chan protocol.Event
 }
+
+// Commissioner is implemented by managers that add devices via pairing
+// codes (Matter) instead of permit-join.
+type Commissioner interface {
+	Commission(code string) error
+}

@@ -18,6 +18,8 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
+          _AppearanceSection(),
+          SizedBox(height: 24),
           _BridgeSection(),
           SizedBox(height: 24),
           _HaSection(),
@@ -25,6 +27,48 @@ class SettingsScreen extends ConsumerWidget {
           _MqttSection(),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Appearance
+// ---------------------------------------------------------------------------
+
+class _AppearanceSection extends ConsumerWidget {
+  const _AppearanceSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        SegmentedButton<ThemeMode>(
+          segments: const [
+            ButtonSegment(
+                value: ThemeMode.system,
+                label: Text('System'),
+                icon: Icon(Icons.brightness_auto)),
+            ButtonSegment(
+                value: ThemeMode.light,
+                label: Text('Light'),
+                icon: Icon(Icons.light_mode)),
+            ButtonSegment(
+                value: ThemeMode.dark,
+                label: Text('Dark'),
+                icon: Icon(Icons.dark_mode)),
+          ],
+          selected: {mode},
+          onSelectionChanged: (s) async {
+            ref.read(themeModeProvider.notifier).state = s.first;
+            final store = await ref.read(localStoreProvider.future);
+            await store.saveThemeMode(s.first.name);
+          },
+        ),
+      ],
     );
   }
 }

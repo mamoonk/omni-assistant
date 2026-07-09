@@ -17,6 +17,8 @@ abstract final class CapabilityType {
   static const battery = 'battery';
   static const cover = 'cover';
   static const lock = 'lock';
+  static const power = 'power'; // instantaneous draw, W
+  static const energy = 'energy'; // cumulative, kWh
 }
 
 abstract class Capability {

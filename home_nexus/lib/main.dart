@@ -13,16 +13,17 @@ import 'state/device_providers.dart';
 import 'state/ha_connection.dart';
 import 'state/layout_provider.dart';
 import 'widgets/device_card.dart';
+import 'widgets/energy_view.dart';
 import 'widgets/new_tab_dialog.dart';
 import 'widgets/scene_bar.dart';
 
 void main() => runApp(const ProviderScope(child: HomeNexusApp()));
 
-class HomeNexusApp extends StatelessWidget {
+class HomeNexusApp extends ConsumerWidget {
   const HomeNexusApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Home Nexus',
       debugShowCheckedModeBanner: false,
@@ -34,6 +35,7 @@ class HomeNexusApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF4E7FFF),
         brightness: Brightness.dark,
       ),
+      themeMode: ref.watch(themeModeProvider),
       home: const _Bootstrap(),
     );
   }
@@ -57,14 +59,20 @@ class _Bootstrap extends ConsumerWidget {
   }
 }
 
-/// A dashboard tab: either the implicit all/room tabs or a user tab.
+/// A dashboard tab: implicit all/room tabs, the energy view, or a user tab.
 class _TabSpec {
   final String title;
   final String? room; // room filter
   final CustomTab? custom; // explicit device list
-  const _TabSpec.all() : title = 'All Devices', room = null, custom = null;
-  const _TabSpec.room(String this.room) : title = room, custom = null;
-  _TabSpec.custom(CustomTab this.custom) : title = custom.name, room = null;
+  final bool energy;
+  const _TabSpec.all()
+      : title = 'All Devices', room = null, custom = null, energy = false;
+  const _TabSpec.room(String this.room)
+      : title = room, custom = null, energy = false;
+  _TabSpec.custom(CustomTab this.custom)
+      : title = custom.name, room = null, energy = false;
+  const _TabSpec.energy()
+      : title = 'Energy', room = null, custom = null, energy = true;
 }
 
 class DashboardScreen extends ConsumerWidget {
@@ -75,8 +83,11 @@ class DashboardScreen extends ConsumerWidget {
     final rooms = ref.watch(roomsProvider);
     final layout = ref.watch(layoutProvider);
     final editing = ref.watch(editModeProvider);
+    final hasEnergy = ref.watch(devicesProvider).any((d) =>
+        d.has(CapabilityType.power) || d.has(CapabilityType.energy));
     final tabs = <_TabSpec>[
       const _TabSpec.all(),
+      if (hasEnergy) const _TabSpec.energy(),
       for (final room in rooms) _TabSpec.room(room),
       for (final tab in layout.tabs) _TabSpec.custom(tab),
     ];
@@ -153,7 +164,10 @@ class DashboardScreen extends ConsumerWidget {
             const SceneBar(),
             Expanded(
               child: TabBarView(
-                children: [for (final tab in tabs) _DeviceGrid(tab: tab)],
+                children: [
+                  for (final tab in tabs)
+                    tab.energy ? const EnergyView() : _DeviceGrid(tab: tab),
+                ],
               ),
             ),
           ],

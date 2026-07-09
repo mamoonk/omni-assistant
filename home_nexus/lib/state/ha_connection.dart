@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_assistant_adapter/home_assistant_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -157,6 +158,9 @@ final haConnectionProvider =
 final localStoreProvider = FutureProvider<LocalStore>((ref) async =>
     LocalStore(await SharedPreferences.getInstance()));
 
+/// Persisted appearance setting (§7 polish).
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
 /// Routes each command to the adapter that owns the device's origin.
 /// Mock/demo devices always mutate locally.
 class RoutingController implements DeviceController {
@@ -201,6 +205,11 @@ final controllerProvider = Provider<DeviceController>((ref) {
 final bootstrapProvider = FutureProvider<void>((ref) async {
   final store = await ref.watch(localStoreProvider.future);
 
+  final themeMode = store.loadThemeMode();
+  if (themeMode != null) {
+    ref.read(themeModeProvider.notifier).state =
+        ThemeMode.values.byName(themeMode);
+  }
   ref.read(scenesProvider.notifier).load(store.loadScenesJson());
   ref.read(layoutProvider.notifier).load(store.loadLayoutJson());
   ref.read(manualIpProvider.notifier).load(store.loadManualDevicesJson());

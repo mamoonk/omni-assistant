@@ -46,6 +46,7 @@ backoff). Prerequisite: Node.js and a zigbee2mqtt checkout on the host.
 | `-mqtt-listen` | :1884 | embedded broker address |
 | `-mqtt-base` | zigbee2mqtt | z2m base topic |
 | `-z2m-cmd` | (empty) | command to launch & supervise z2m |
+| `-chip-tool` | (empty) | path to chip-tool for real Matter commissioning |
 | `-no-mdns` | off | disable mDNS advertisement |
 
 ## Protocol
@@ -63,4 +64,8 @@ linux/arm64 (Raspberry Pi), linux/amd64, darwin/arm64, windows/amd64.
 ## Status
 
 - ✅ demo manager, Zigbee2MQTT manager (embedded broker, supervisor)
+- ✅ automation runtime (synced from the app, survives restarts)
+- ✅ Matter: QR payload parsing + commissioning (simulated controller in
+  demo mode; `-chip-tool` for real hardware)
 - ⏳ Z-Wave JS UI manager — deferred until test hardware is available
+- ⏳ chip-tool attribute subscriptions / per-node control routing

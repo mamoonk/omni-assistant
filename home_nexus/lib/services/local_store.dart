@@ -72,6 +72,7 @@ class LocalStore {
   static const _layoutKey = 'layout';
   static const _manualDevicesKey = 'manual_devices';
   static const _automationsKey = 'automations';
+  static const _themeModeKey = 'theme_mode';
 
   final SharedPreferences _prefs;
   LocalStore(this._prefs);
@@ -138,4 +139,8 @@ class LocalStore {
   Future<void> saveAutomationsJson(String json) =>
       _prefs.setString(_automationsKey, json);
   String? loadAutomationsJson() => _prefs.getString(_automationsKey);
+
+  Future<void> saveThemeMode(String mode) =>
+      _prefs.setString(_themeModeKey, mode);
+  String? loadThemeMode() => _prefs.getString(_themeModeKey);
 }

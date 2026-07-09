@@ -28,11 +28,13 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   int _secondsLeft = _joinWindowSeconds;
   bool _interviewing = false;
   final _found = <UniversalDevice>[];
+  final _matterCodeCtrl = TextEditingController();
   Timer? _countdown;
   StreamSubscription? _joinSub;
 
   @override
   void dispose() {
+    _matterCodeCtrl.dispose();
     _countdown?.cancel();
     _joinSub?.cancel();
     super.dispose();
@@ -56,6 +58,8 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
             _interviewing = false;
             _found.add(device);
           });
+          // matter commissions one device per code; done as soon as it lands
+          if (_protocol == 'matter') _finishSearch();
         case PermitJoinChanged(:final enabled):
           if (!enabled && _found.isNotEmpty) _finishSearch();
       }
@@ -68,12 +72,18 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     });
 
     try {
-      await adapter.permitJoin(
-          protocol: _protocol, duration: _joinWindowSeconds);
+      if (_protocol == 'matter') {
+        await adapter.commission(_matterCodeCtrl.text.trim());
+      } else {
+        await adapter.permitJoin(
+            protocol: _protocol, duration: _joinWindowSeconds);
+      }
     } catch (e) {
+      _countdown?.cancel();
+      _joinSub?.cancel();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to open network: $e')));
+          .showSnackBar(SnackBar(content: Text('Failed to start: $e')));
       setState(() => _step = _Step.pickProtocol);
     }
   }
@@ -122,8 +132,18 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
         _Step.pickProtocol => _ProtocolPicker(
             protocols: conn.info?.protocols ?? const ['zigbee'],
             selected: _protocol,
+            matterCodeCtrl: _matterCodeCtrl,
             onSelect: (p) => setState(() => _protocol = p),
-            onStart: () => _startSearch(adapter),
+            onStart: () {
+              if (_protocol == 'matter' &&
+                  !_matterCodeCtrl.text.trim().startsWith('MT:')) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content:
+                        Text('Enter the QR payload starting with MT:')));
+                return;
+              }
+              _startSearch(adapter);
+            },
           ),
         _Step.searching => _SearchingView(
             secondsLeft: _secondsLeft,
@@ -143,15 +163,23 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
 class _ProtocolPicker extends StatelessWidget {
   final List<String> protocols;
   final String selected;
+  final TextEditingController matterCodeCtrl;
   final ValueChanged<String> onSelect;
   final VoidCallback onStart;
 
   const _ProtocolPicker({
     required this.protocols,
     required this.selected,
+    required this.matterCodeCtrl,
     required this.onSelect,
     required this.onStart,
   });
+
+  static const _labels = {
+    'zigbee': ('Zigbee', 'Put the device in pairing mode, then start the search'),
+    'zwave': ('Z-Wave', 'Put the device in inclusion mode'),
+    'matter': ('Matter', 'Enter the code under the QR on the device'),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -167,19 +195,28 @@ class _ProtocolPicker extends StatelessWidget {
             children: [
               for (final p in protocols)
                 RadioListTile<String>(
-                  title: Text(p == 'zigbee' ? 'Zigbee' : p),
-                  subtitle: Text(p == 'zigbee'
-                      ? 'Put the device in pairing mode, then start the search'
-                      : ''),
+                  title: Text(_labels[p]?.$1 ?? p),
+                  subtitle: Text(_labels[p]?.$2 ?? ''),
                   value: p,
                 ),
             ],
           ),
         ),
+        if (selected == 'matter') ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: matterCodeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Matter pairing code',
+              hintText: 'MT:Y.K9042C00KA0648G00',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         FilledButton.icon(
-          icon: const Icon(Icons.search),
-          label: const Text('Start search'),
+          icon: Icon(selected == 'matter' ? Icons.qr_code : Icons.search),
+          label: Text(selected == 'matter' ? 'Commission' : 'Start search'),
           onPressed: onStart,
         ),
       ],

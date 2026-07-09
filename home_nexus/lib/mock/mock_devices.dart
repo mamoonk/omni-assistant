@@ -41,6 +41,18 @@ List<UniversalDevice> buildMockDevices() => [
         capabilities: [PowerSwitchCapability()],
       ),
       UniversalDevice(
+        id: 'mock:washer_plug',
+        name: 'Washer Plug',
+        origin: _origin,
+        roomId: 'Kitchen',
+        capabilities: [
+          PowerSwitchCapability(on: true),
+          SensorCapability(type: CapabilityType.power, value: 480, unit: 'W'),
+          SensorCapability(
+              type: CapabilityType.energy, value: 12.4, unit: 'kWh'),
+        ],
+      ),
+      UniversalDevice(
         id: 'mock:front_door',
         name: 'Front Door',
         origin: _origin,

@@ -38,6 +38,8 @@ const (
 	CapMotion             = "motion"
 	CapContact            = "contact"
 	CapBattery            = "battery"
+	CapPower              = "power"  // instantaneous draw, W
+	CapEnergy             = "energy" // cumulative, kWh
 )
 
 // Find returns the capability with the given type, or nil.

@@ -95,6 +95,8 @@ List<Capability> _parseExpose(Map<String, dynamic> expose) {
         'humidity' => CapabilityType.humidity,
         'illuminance' || 'illuminance_lux' => CapabilityType.illuminance,
         'battery' => CapabilityType.battery,
+        'power' => CapabilityType.power,
+        'energy' => CapabilityType.energy,
         _ => null,
       };
       if (type == null) return const [];
@@ -162,10 +164,17 @@ bool applyZ2mState(UniversalDevice device, Map<String, dynamic> payload) {
           s.value = entry.value as num;
           mark();
         }
-      case 'humidity' || 'battery' || 'illuminance' || 'illuminance_lux':
+      case 'humidity' ||
+            'battery' ||
+            'illuminance' ||
+            'illuminance_lux' ||
+            'power' ||
+            'energy':
         final type = switch (entry.key) {
           'humidity' => CapabilityType.humidity,
           'battery' => CapabilityType.battery,
+          'power' => CapabilityType.power,
+          'energy' => CapabilityType.energy,
           _ => CapabilityType.illuminance,
         };
         final s = device.capabilities

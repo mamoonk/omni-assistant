@@ -320,6 +320,24 @@ func (s *Server) dispatchRadio(m manager.RadioManager, cmd protocol.Command) pro
 			return protocol.Fail(cmd.ID, err)
 		}
 		return protocol.OK(cmd.ID, map[string]any{"duration": p.Duration})
+
+	case "commission":
+		commissioner, ok := m.(manager.Commissioner)
+		if !ok {
+			return protocol.Fail(cmd.ID,
+				fmt.Errorf("%s does not support commissioning", cmd.Domain))
+		}
+		var p struct {
+			Code string `json:"code"`
+		}
+		if err := json.Unmarshal(cmd.Params, &p); err != nil {
+			return protocol.Fail(cmd.ID, err)
+		}
+		if err := commissioner.Commission(p.Code); err != nil {
+			return protocol.Fail(cmd.ID, err)
+		}
+		return protocol.OK(cmd.ID, nil)
+
 	default:
 		return protocol.Fail(cmd.ID, fmt.Errorf("unknown action %q", cmd.Action))
 	}

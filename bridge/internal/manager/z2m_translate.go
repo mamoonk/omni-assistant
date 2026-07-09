@@ -125,6 +125,10 @@ func parseExpose(expose map[string]any) []device.Capability {
 			capType = device.CapHumidity
 		case "battery":
 			capType = device.CapBattery
+		case "power":
+			capType = device.CapPower
+		case "energy":
+			capType = device.CapEnergy
 		}
 		if capType == "" {
 			return nil
@@ -181,6 +185,16 @@ func ApplyZ2MState(d *device.Device, payload map[string]any) bool {
 			}
 		case "battery":
 			if c := d.Find(device.CapBattery); c != nil {
+				c.State["value"] = value
+				changed = true
+			}
+		case "power":
+			if c := d.Find(device.CapPower); c != nil {
+				c.State["value"] = value
+				changed = true
+			}
+		case "energy":
+			if c := d.Find(device.CapEnergy); c != nil {
 				c.State["value"] = value
 				changed = true
 			}

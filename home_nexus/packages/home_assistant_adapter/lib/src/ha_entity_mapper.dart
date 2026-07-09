@@ -58,6 +58,8 @@ UniversalDevice? mapHaEntity(
         'humidity' => CapabilityType.humidity,
         'illuminance' => CapabilityType.illuminance,
         'battery' => CapabilityType.battery,
+        'power' => CapabilityType.power,
+        'energy' => CapabilityType.energy,
         _ => null,
       };
       if (type == null) return null; // skip unmapped sensor classes for now
