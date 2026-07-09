@@ -11,6 +11,7 @@ import (
 var (
 	bucketDevices     = []byte("devices")
 	bucketAutomations = []byte("automations")
+	bucketConfig      = []byte("config")
 )
 
 type Store struct {
@@ -23,11 +24,12 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(bucketDevices); err != nil {
-			return err
+		for _, b := range [][]byte{bucketDevices, bucketAutomations, bucketConfig} {
+			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
+				return err
+			}
 		}
-		_, err := tx.CreateBucketIfNotExists(bucketAutomations)
-		return err
+		return nil
 	})
 	if err != nil {
 		db.Close()
@@ -52,6 +54,23 @@ func (s *Store) DeleteDevice(id string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucketDevices).Delete([]byte(id))
 	})
+}
+
+func (s *Store) SetConfig(key, value string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketConfig).Put([]byte(key), []byte(value))
+	})
+}
+
+func (s *Store) Config(key string) (string, error) {
+	var value string
+	err := s.db.View(func(tx *bolt.Tx) error {
+		if v := tx.Bucket(bucketConfig).Get([]byte(key)); v != nil {
+			value = string(v)
+		}
+		return nil
+	})
+	return value, err
 }
 
 // ReplaceAutomationsJSON stores the full synced rule set as one blob.

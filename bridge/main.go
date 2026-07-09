@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
@@ -32,6 +33,8 @@ func main() {
 	baseTopic := flag.String("mqtt-base", "zigbee2mqtt", "zigbee2mqtt base topic")
 	z2mCmd := flag.String("z2m-cmd", "", "command to launch zigbee2mqtt, e.g. \"node /opt/zigbee2mqtt/index.js\" (empty = externally managed)")
 	chipTool := flag.String("chip-tool", "", "path to chip-tool for real Matter commissioning")
+	token := flag.String("token", "", "pairing token clients must present (default: generated on first run and persisted)")
+	noAuth := flag.Bool("no-auth", false, "disable client authentication (trusted networks only)")
 	flag.Parse()
 
 	if err := os.MkdirAll(*dataDir, 0o755); err != nil {
@@ -85,6 +88,23 @@ func main() {
 	}
 
 	srv := server.New(*name, st, managers...)
+	if !*noAuth {
+		pairingToken := *token
+		if pairingToken == "" {
+			saved, _ := st.Config("pairing_token")
+			if saved == "" {
+				saved = generateToken()
+				if err := st.SetConfig("pairing_token", saved); err != nil {
+					log.Fatalf("persist token: %v", err)
+				}
+			}
+			pairingToken = saved
+		} else {
+			_ = st.SetConfig("pairing_token", pairingToken)
+		}
+		srv.Token = pairingToken
+		log.Printf("pairing token: %s  (enter this in the app; -no-auth disables)", pairingToken)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -116,6 +136,14 @@ func main() {
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+}
+
+func generateToken() string {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("token generation: %v", err)
+	}
+	return fmt.Sprintf("%08x", b)
 }
 
 func defaultDataDir() string {

@@ -95,7 +95,8 @@ class BridgeConnectionNotifier extends Notifier<BridgeConnectionState> {
 
     try {
       final a = NexusBridgeAdapter(connectionId: 'primary');
-      final info = await a.connect(config.host, config.port);
+      final info =
+          await a.connect(config.host, config.port, token: config.token);
       adapter = a;
 
       final devices = await a.fetchAllDevices();

@@ -88,6 +88,7 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _hostCtrl;
   late final TextEditingController _portCtrl;
+  late final TextEditingController _tokenCtrl;
   bool _scanning = false;
 
   Future<void> _scan() async {
@@ -136,12 +137,14 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
     final config = ref.read(bridgeConnectionProvider).config;
     _hostCtrl = TextEditingController(text: config?.host ?? '');
     _portCtrl = TextEditingController(text: '${config?.port ?? 8927}');
+    _tokenCtrl = TextEditingController(text: config?.token ?? '');
   }
 
   @override
   void dispose() {
     _hostCtrl.dispose();
     _portCtrl.dispose();
+    _tokenCtrl.dispose();
     super.dispose();
   }
 
@@ -180,33 +183,49 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
         const SizedBox(height: 12),
         Form(
           key: _formKey,
-          child: Row(
+          child: Column(
             children: [
-              Expanded(
-                flex: 3,
-                child: TextFormField(
-                  controller: _hostCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Host',
-                    hintText: '192.168.1.20',
-                    border: OutlineInputBorder(),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: TextFormField(
+                      controller: _hostCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Host',
+                        hintText: '192.168.1.20',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Host required'
+                          : null,
+                    ),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Host required' : null,
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _portCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Port',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          int.tryParse(v ?? '') == null ? 'Invalid' : null,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _portCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Port',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) =>
-                      int.tryParse(v ?? '') == null ? 'Invalid' : null,
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _tokenCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Pairing token',
+                  helperText: 'Printed in the bridge log on startup',
+                  border: OutlineInputBorder(),
                 ),
+                obscureText: true,
+                maxLines: 1,
               ),
             ],
           ),
@@ -222,6 +241,7 @@ class _BridgeSectionState extends ConsumerState<_BridgeSection> {
             ref.read(bridgeConnectionProvider.notifier).connect(BridgeConfig(
                   host: _hostCtrl.text.trim(),
                   port: int.parse(_portCtrl.text.trim()),
+                  token: _tokenCtrl.text.trim(),
                 ));
           },
           onDisconnect: () =>

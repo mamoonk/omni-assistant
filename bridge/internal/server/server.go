@@ -26,7 +26,10 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	Name     string
+	Name string
+	// Token, when non-empty, must be presented by clients in an auth
+	// message before any command is accepted.
+	Token    string
 	store    *store.Store
 	managers map[string]manager.RadioManager // by protocol domain
 	engine   *automation.Engine
@@ -36,8 +39,9 @@ type Server struct {
 }
 
 type client struct {
-	conn *websocket.Conn
-	send chan any
+	conn   *websocket.Conn
+	send   chan any
+	authed bool
 }
 
 func New(name string, st *store.Store, managers ...manager.RadioManager) *Server {
@@ -205,8 +209,29 @@ func (s *Server) readLoop(c *client) {
 		if err != nil {
 			return
 		}
+		var envelope struct {
+			Type  string `json:"type"`
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			continue
+		}
+
+		if envelope.Type == "auth" {
+			c.authed = s.Token == "" || envelope.Token == s.Token
+			c.send <- map[string]any{"type": "auth_result", "success": c.authed}
+			continue
+		}
+		if envelope.Type != "command" {
+			continue
+		}
 		var cmd protocol.Command
-		if err := json.Unmarshal(raw, &cmd); err != nil || cmd.Type != "command" {
+		if err := json.Unmarshal(raw, &cmd); err != nil {
+			continue
+		}
+		if s.Token != "" && !c.authed {
+			c.send <- protocol.Fail(cmd.ID,
+				fmt.Errorf("unauthorized: send auth with the pairing token first"))
 			continue
 		}
 		c.send <- s.Dispatch(cmd)

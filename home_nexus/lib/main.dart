@@ -11,17 +11,23 @@ import 'screens/manual_ip_screen.dart';
 import 'screens/settings_screen.dart';
 import 'state/device_providers.dart';
 import 'state/ha_connection.dart';
+import 'state/kiosk_provider.dart';
 import 'state/layout_provider.dart';
 import 'state/mqtt_connection.dart';
 import 'state/bridge_connection.dart';
 import 'theme/ambient.dart';
+import 'widgets/screensaver.dart';
 import 'widgets/ambient_header.dart';
 import 'widgets/device_card.dart';
 import 'widgets/energy_view.dart';
 import 'widgets/new_tab_dialog.dart';
 import 'widgets/scene_bar.dart';
 
-void main() => runApp(const ProviderScope(child: HomeNexusApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initKioskSupport();
+  runApp(const ProviderScope(child: HomeNexusApp()));
+}
 
 class HomeNexusApp extends ConsumerWidget {
   const HomeNexusApp({super.key});
@@ -139,8 +145,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final tab = tabs[selected];
     final wide = MediaQuery.sizeOf(context).width >= 900;
 
+    final kiosk = ref.watch(kioskProvider);
     final actions = <Widget>[
       const _ConnectionIndicator(),
+      AmbientIconButton(
+        icon: kiosk ? Icons.fullscreen_exit : Icons.fullscreen,
+        tooltip: kiosk ? 'Exit display mode' : 'Display mode',
+        highlighted: kiosk,
+        onPressed: () => setKioskMode(ref, !kiosk),
+      ),
       AmbientIconButton(
         icon: Icons.add,
         tooltip: 'Add device',
@@ -201,7 +214,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Theme(
       data: Ambient.theme(),
       child: Builder(
-        builder: (context) => Container(
+        builder: (context) => IdleScreensaver(
+          child: Container(
           decoration: BoxDecoration(
             gradient: Ambient.backgroundGradient(DateTime.now().hour),
           ),
@@ -225,6 +239,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ],
                     ),
             ),
+          ),
           ),
         ),
       ),

@@ -1,0 +1,26 @@
+# Pure-Dart Windows implementation of flutter_secure_storage (DPAPI via
+# FFI). Used as a dependency_override to drop the upstream package's C++
+# migration plugin, which requires ATL headers not present in minimal VS
+# Build Tools installs.
+name: flutter_secure_storage_windows
+description: Dart-only DPAPI implementation of flutter_secure_storage for Windows.
+version: 3.1.2
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage_platform_interface: '>=1.0.0 <2.0.0'
+  ffi: ^2.1.0
+  win32: ^5.5.0
+
+flutter:
+  plugin:
+    implements: flutter_secure_storage
+    platforms:
+      windows:
+        dartPluginClass: FlutterSecureStorageWindows

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unification/unification.dart';
 
+import 'secret_store.dart';
+
 class MqttConfig {
   final String host;
   final int port;
@@ -38,14 +40,17 @@ class MqttConfig {
 class BridgeConfig {
   final String host;
   final int port;
+  final String token; // pairing token printed by the bridge on startup
 
-  const BridgeConfig({required this.host, this.port = 8927});
+  const BridgeConfig({required this.host, this.port = 8927, this.token = ''});
 
-  Map<String, dynamic> toJson() => {'host': host, 'port': port};
+  Map<String, dynamic> toJson() =>
+      {'host': host, 'port': port, 'token': token};
 
   factory BridgeConfig.fromJson(Map<String, dynamic> json) => BridgeConfig(
         host: json['host'] as String,
         port: json['port'] as int? ?? 8927,
+        token: json['token'] as String? ?? '',
       );
 }
 
@@ -75,18 +80,32 @@ class LocalStore {
   static const _themeModeKey = 'theme_mode';
 
   final SharedPreferences _prefs;
-  LocalStore(this._prefs);
+  final SecretStore _secrets;
+  LocalStore(this._prefs, this._secrets);
+
+  /// Connection configs carry credentials -> secret store. A legacy
+  /// plaintext copy in prefs is migrated on first read, then removed.
+  Future<String?> _readSecret(String key) async {
+    final secret = await _secrets.read(key);
+    if (secret != null) return secret;
+    final legacy = _prefs.getString(key);
+    if (legacy != null) {
+      await _secrets.write(key, legacy);
+      await _prefs.remove(key);
+    }
+    return legacy;
+  }
 
   Future<void> saveConfig(HaConfig config) =>
-      _prefs.setString(_configKey, jsonEncode(config.toJson()));
+      _secrets.write(_configKey, jsonEncode(config.toJson()));
 
-  HaConfig? loadConfig() {
-    final raw = _prefs.getString(_configKey);
+  Future<HaConfig?> loadConfig() async {
+    final raw = await _readSecret(_configKey);
     if (raw == null) return null;
     return HaConfig.fromJson((jsonDecode(raw) as Map).cast<String, dynamic>());
   }
 
-  Future<void> clearConfig() => _prefs.remove(_configKey);
+  Future<void> clearConfig() => _secrets.delete(_configKey);
 
   Future<void> saveDevices(List<UniversalDevice> devices) => _prefs.setString(
       _devicesKey, jsonEncode([for (final d in devices) deviceToJson(d)]));
@@ -103,28 +122,28 @@ class LocalStore {
   Future<void> clearDevices() => _prefs.remove(_devicesKey);
 
   Future<void> saveMqttConfig(MqttConfig config) =>
-      _prefs.setString(_mqttConfigKey, jsonEncode(config.toJson()));
+      _secrets.write(_mqttConfigKey, jsonEncode(config.toJson()));
 
-  MqttConfig? loadMqttConfig() {
-    final raw = _prefs.getString(_mqttConfigKey);
+  Future<MqttConfig?> loadMqttConfig() async {
+    final raw = await _readSecret(_mqttConfigKey);
     if (raw == null) return null;
     return MqttConfig.fromJson(
         (jsonDecode(raw) as Map).cast<String, dynamic>());
   }
 
-  Future<void> clearMqttConfig() => _prefs.remove(_mqttConfigKey);
+  Future<void> clearMqttConfig() => _secrets.delete(_mqttConfigKey);
 
   Future<void> saveBridgeConfig(BridgeConfig config) =>
-      _prefs.setString(_bridgeConfigKey, jsonEncode(config.toJson()));
+      _secrets.write(_bridgeConfigKey, jsonEncode(config.toJson()));
 
-  BridgeConfig? loadBridgeConfig() {
-    final raw = _prefs.getString(_bridgeConfigKey);
+  Future<BridgeConfig?> loadBridgeConfig() async {
+    final raw = await _readSecret(_bridgeConfigKey);
     if (raw == null) return null;
     return BridgeConfig.fromJson(
         (jsonDecode(raw) as Map).cast<String, dynamic>());
   }
 
-  Future<void> clearBridgeConfig() => _prefs.remove(_bridgeConfigKey);
+  Future<void> clearBridgeConfig() => _secrets.delete(_bridgeConfigKey);
 
   Future<void> saveScenesJson(String json) => _prefs.setString(_scenesKey, json);
   String? loadScenesJson() => _prefs.getString(_scenesKey);

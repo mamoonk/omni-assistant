@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.6.1
   shared_preferences: ^2.3.0
+  flutter_secure_storage: ^9.2.0
+  window_manager: ^0.4.3
+  wakelock_plus: ^1.2.8
   flutter_staggered_grid_view: ^0.7.0
   mqtt_adapter:
     path: packages/mqtt_adapter
@@ -45,6 +48,12 @@ dependencies:
     path: packages/unification
   home_assistant_adapter:
     path: packages/home_assistant_adapter
+
+# Upstream flutter_secure_storage_windows ships a C++ migration plugin that
+# needs ATL headers; this pure-Dart DPAPI drop-in removes the native build.
+dependency_overrides:
+  flutter_secure_storage_windows:
+    path: packages/flutter_secure_storage_windows_dpapi
 
 dev_dependencies:
   flutter_test:

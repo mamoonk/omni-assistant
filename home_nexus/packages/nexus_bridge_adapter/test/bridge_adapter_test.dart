@@ -12,6 +12,9 @@ class FakeBridge {
   WebSocket? socket;
   final receivedCommands = <Map<String, dynamic>>[];
 
+  /// When set, auth succeeds only with this token.
+  String? requiredToken;
+
   int get port => server.port;
 
   Future<void> start() async {
@@ -21,6 +24,13 @@ class FakeBridge {
       socket = await WebSocketTransformer.upgrade(req);
       socket!.listen((raw) {
         final cmd = jsonDecode(raw as String) as Map<String, dynamic>;
+        if (cmd['type'] == 'auth') {
+          _send({
+            'type': 'auth_result',
+            'success': requiredToken == null || cmd['token'] == requiredToken,
+          });
+          return;
+        }
         receivedCommands.add(cmd);
         _respond(cmd);
       });
@@ -120,6 +130,20 @@ void main() {
     final info = await adapter.connect('127.0.0.1', bridge.port);
     expect(info.name, 'Fake Bridge');
     expect(info.protocols, ['zigbee']);
+  });
+
+  test('auth: correct token accepted, wrong token rejected', () async {
+    bridge.requiredToken = 'secret';
+    final info =
+        await adapter.connect('127.0.0.1', bridge.port, token: 'secret');
+    expect(info.name, 'Fake Bridge');
+    await adapter.disconnect();
+
+    final rejected = NexusBridgeAdapter(connectionId: 'test2');
+    await expectLater(
+      rejected.connect('127.0.0.1', bridge.port, token: 'wrong'),
+      throwsA(isA<StateError>()),
+    );
   });
 
   test('fetchAllDevices maps protocol JSON to UniversalDevice', () async {

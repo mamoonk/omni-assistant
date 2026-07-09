@@ -9,9 +9,10 @@ import 'package:unification/unification.dart';
 Future<void> main(List<String> args) async {
   final host = args.isNotEmpty ? args[0] : '127.0.0.1';
   final port = args.length > 1 ? int.parse(args[1]) : 8927;
+  final token = args.length > 2 ? args[2] : '';
 
   final adapter = NexusBridgeAdapter(connectionId: 'smoke');
-  final info = await adapter.connect(host, port);
+  final info = await adapter.connect(host, port, token: token);
   print('connected: ${info.name} v${info.version} ${info.protocols}');
 
   final joins = <JoinEvent>[];

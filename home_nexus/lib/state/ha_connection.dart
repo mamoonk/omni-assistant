@@ -9,6 +9,7 @@ import 'package:unification/unification.dart';
 
 import '../mock/mock_devices.dart';
 import '../services/local_store.dart';
+import '../services/secret_store.dart';
 import 'bridge_connection.dart';
 import 'device_providers.dart';
 import 'automations_provider.dart';
@@ -156,7 +157,7 @@ final haConnectionProvider =
         HaConnectionNotifier.new);
 
 final localStoreProvider = FutureProvider<LocalStore>((ref) async =>
-    LocalStore(await SharedPreferences.getInstance()));
+    LocalStore(await SharedPreferences.getInstance(), SecureSecretStore()));
 
 /// Persisted appearance setting (§7 polish).
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
@@ -223,19 +224,19 @@ final bootstrapProvider = FutureProvider<void>((ref) async {
     _seedMockHistory(ref);
   }
 
-  final config = store.loadConfig();
+  final config = await store.loadConfig();
   if (config != null) {
     // fire and forget; UI shows reconnecting state
     unawaited(
         ref.read(haConnectionProvider.notifier).connect(config, save: false));
   }
-  final mqttConfig = store.loadMqttConfig();
+  final mqttConfig = await store.loadMqttConfig();
   if (mqttConfig != null) {
     unawaited(ref
         .read(mqttConnectionProvider.notifier)
         .connect(mqttConfig, save: false));
   }
-  final bridgeConfig = store.loadBridgeConfig();
+  final bridgeConfig = await store.loadBridgeConfig();
   if (bridgeConfig != null) {
     unawaited(ref
         .read(bridgeConnectionProvider.notifier)

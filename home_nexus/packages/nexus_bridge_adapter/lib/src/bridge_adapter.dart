@@ -45,6 +45,7 @@ class NexusBridgeAdapter implements DeviceController {
   final _deviceUpdates = StreamController<UniversalDevice>.broadcast();
   final _joinEvents = StreamController<JoinEvent>.broadcast();
   final _connectionEvents = StreamController<bool>.broadcast();
+  Completer<bool>? _pendingAuth;
   bool _userDisconnected = false;
 
   NexusBridgeAdapter({this.connectionId = 'default'});
@@ -55,7 +56,7 @@ class NexusBridgeAdapter implements DeviceController {
   /// true after connect, false on unexpected drop.
   Stream<bool> get connectionEvents => _connectionEvents.stream;
 
-  Future<BridgeInfo> connect(String host, int port) async {
+  Future<BridgeInfo> connect(String host, int port, {String token = ''}) async {
     _userDisconnected = false;
     final uri = Uri.parse('ws://$host:$port/ws');
     _channel = WebSocketChannel.connect(uri);
@@ -71,6 +72,17 @@ class NexusBridgeAdapter implements DeviceController {
       },
     );
 
+    // authenticate first; bridges without auth reply success for any token
+    final authed = Completer<bool>();
+    _pendingAuth = authed;
+    _channel!.sink.add(jsonEncode({'type': 'auth', 'token': token}));
+    final ok = await authed.future.timeout(const Duration(seconds: 10));
+    _pendingAuth = null;
+    if (!ok) {
+      await disconnect();
+      throw StateError('Bridge rejected the pairing token');
+    }
+
     final info = await _request('bridge', 'info');
     _connectionEvents.add(true);
     return BridgeInfo(
@@ -82,6 +94,10 @@ class NexusBridgeAdapter implements DeviceController {
 
   void _onMessage(Map<String, dynamic> msg) {
     switch (msg['type']) {
+      case 'auth_result':
+        if (_pendingAuth?.isCompleted == false) {
+          _pendingAuth!.complete(msg['success'] == true);
+        }
       case 'result':
         final completer = _pending.remove(msg['id']);
         if (completer == null) return;
