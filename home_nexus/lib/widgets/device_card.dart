@@ -4,6 +4,7 @@ import 'package:unification/unification.dart';
 
 import '../state/ha_connection.dart';
 import '../state/history_provider.dart';
+import '../state/mqtt_connection.dart';
 import 'color_wheel.dart';
 import 'sparkline.dart';
 
@@ -59,11 +60,14 @@ class _Header extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final conn = ref.watch(haConnectionProvider);
-    // HA-sourced device shown while the connection is down = stale data
-    final stale = device.origin.type == OriginType.homeAssistant &&
-        device.origin.connectionId != 'mock' &&
-        conn.status != HaStatus.connected;
+    // device shown while its source connection is down = stale data
+    final status = switch (device.origin.type) {
+      OriginType.homeAssistant => ref.watch(haConnectionProvider).status,
+      OriginType.mqtt => ref.watch(mqttConnectionProvider).status,
+      _ => HaStatus.connected,
+    };
+    final stale = device.origin.connectionId != 'mock' &&
+        status != HaStatus.connected;
 
     return Row(
       children: [

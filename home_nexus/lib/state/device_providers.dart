@@ -58,6 +58,17 @@ class DevicesNotifier extends Notifier<List<UniversalDevice>> {
     devices.forEach(_recordHistory);
   }
 
+  /// Swaps all devices of one origin, keeping other origins intact.
+  /// Demo/mock devices are dropped once any real source provides devices.
+  void replaceOrigin(OriginType origin, List<UniversalDevice> devices) {
+    state = [
+      ...state.where((d) =>
+          d.origin.type != origin && d.origin.connectionId != 'mock'),
+      ...devices,
+    ];
+    devices.forEach(_recordHistory);
+  }
+
   void _recordHistory(UniversalDevice device) {
     final temp = device.capabilities
         .whereType<SensorCapability>()

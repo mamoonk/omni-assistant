@@ -10,6 +10,9 @@ import '../mock/mock_devices.dart';
 import '../services/local_store.dart';
 import 'device_providers.dart';
 import 'history_provider.dart';
+import 'layout_provider.dart';
+import 'mqtt_connection.dart';
+import 'scenes_provider.dart';
 
 enum HaStatus { disconnected, connecting, connected, reconnecting, error }
 
@@ -76,8 +79,8 @@ class HaConnectionNotifier extends Notifier<HaConnectionState> {
 
       final devices = await a.fetchAllDevices();
       final notifier = ref.read(devicesProvider.notifier)
-        ..replaceAll(devices);
-      await store.saveDevices(devices);
+        ..replaceOrigin(OriginType.homeAssistant, devices);
+      await store.saveDevices(ref.read(devicesProvider));
 
       _updatesSub = a.deviceUpdates.listen((d) {
         notifier.upsert(d);
@@ -151,17 +154,49 @@ final haConnectionProvider =
 final localStoreProvider = FutureProvider<LocalStore>((ref) async =>
     LocalStore(await SharedPreferences.getInstance()));
 
-/// Live adapter when connected, local mock otherwise.
+/// Routes each command to the adapter that owns the device's origin.
+/// Mock/demo devices always mutate locally.
+class RoutingController implements DeviceController {
+  final Ref _ref;
+  RoutingController(this._ref);
+
+  @override
+  Future<void> sendCommand(
+    UniversalDevice device,
+    String capabilityType,
+    dynamic value,
+  ) {
+    if (device.origin.connectionId == 'mock') {
+      return MockDeviceController(_ref)
+          .sendCommand(device, capabilityType, value);
+    }
+    final adapter = switch (device.origin.type) {
+      OriginType.homeAssistant =>
+        _ref.read(haConnectionProvider.notifier).adapter,
+      OriginType.mqtt => _ref.read(mqttConnectionProvider.notifier).adapter,
+      _ => null,
+    };
+    if (adapter == null) {
+      // offline: leave state untouched; card badge already shows staleness
+      return Future.value();
+    }
+    return adapter.sendCommand(device, capabilityType, value);
+  }
+}
+
 final controllerProvider = Provider<DeviceController>((ref) {
-  final conn = ref.watch(haConnectionProvider);
-  final adapter = ref.read(haConnectionProvider.notifier).adapter;
-  if (conn.status == HaStatus.connected && adapter != null) return adapter;
-  return MockDeviceController(ref);
+  // rebuild routing when either connection changes
+  ref.watch(haConnectionProvider);
+  ref.watch(mqttConnectionProvider);
+  return RoutingController(ref);
 });
 
 /// Cold-start: load cached devices + auto-connect if configured.
 final bootstrapProvider = FutureProvider<void>((ref) async {
   final store = await ref.watch(localStoreProvider.future);
+
+  ref.read(scenesProvider.notifier).load(store.loadScenesJson());
+  ref.read(layoutProvider.notifier).load(store.loadLayoutJson());
 
   final cached = store.loadDevices();
   if (cached.isNotEmpty) {
@@ -175,6 +210,12 @@ final bootstrapProvider = FutureProvider<void>((ref) async {
     // fire and forget; UI shows reconnecting state
     unawaited(
         ref.read(haConnectionProvider.notifier).connect(config, save: false));
+  }
+  final mqttConfig = store.loadMqttConfig();
+  if (mqttConfig != null) {
+    unawaited(ref
+        .read(mqttConnectionProvider.notifier)
+        .connect(mqttConfig, save: false));
   }
 });
 

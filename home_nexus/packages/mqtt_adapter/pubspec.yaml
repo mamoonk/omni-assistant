@@ -1,0 +1,16 @@
+name: mqtt_adapter
+description: Direct MQTT adapter - Zigbee2MQTT/ZWave2MQTT discovery mapped to UniversalDevice.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  unification:
+    path: ../unification
+  mqtt_client: ^10.0.0
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0

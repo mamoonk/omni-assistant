@@ -3,6 +3,38 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unification/unification.dart';
 
+class MqttConfig {
+  final String host;
+  final int port;
+  final String? username;
+  final String? password;
+  final String baseTopic;
+
+  const MqttConfig({
+    required this.host,
+    this.port = 1883,
+    this.username,
+    this.password,
+    this.baseTopic = 'zigbee2mqtt',
+  });
+
+  Map<String, dynamic> toJson() => {
+        'host': host,
+        'port': port,
+        'username': username,
+        'password': password,
+        'baseTopic': baseTopic,
+      };
+
+  factory MqttConfig.fromJson(Map<String, dynamic> json) => MqttConfig(
+        host: json['host'] as String,
+        port: json['port'] as int? ?? 1883,
+        username: json['username'] as String?,
+        password: json['password'] as String?,
+        baseTopic: json['baseTopic'] as String? ?? 'zigbee2mqtt',
+      );
+}
+
 class HaConfig {
   final String url;
   final String token;
@@ -19,7 +51,10 @@ class HaConfig {
 /// Interface kept narrow so the backing store can move to Isar/Drift later.
 class LocalStore {
   static const _configKey = 'ha_config';
+  static const _mqttConfigKey = 'mqtt_config';
   static const _devicesKey = 'device_cache';
+  static const _scenesKey = 'scenes';
+  static const _layoutKey = 'layout';
 
   final SharedPreferences _prefs;
   LocalStore(this._prefs);
@@ -48,4 +83,22 @@ class LocalStore {
   }
 
   Future<void> clearDevices() => _prefs.remove(_devicesKey);
+
+  Future<void> saveMqttConfig(MqttConfig config) =>
+      _prefs.setString(_mqttConfigKey, jsonEncode(config.toJson()));
+
+  MqttConfig? loadMqttConfig() {
+    final raw = _prefs.getString(_mqttConfigKey);
+    if (raw == null) return null;
+    return MqttConfig.fromJson(
+        (jsonDecode(raw) as Map).cast<String, dynamic>());
+  }
+
+  Future<void> clearMqttConfig() => _prefs.remove(_mqttConfigKey);
+
+  Future<void> saveScenesJson(String json) => _prefs.setString(_scenesKey, json);
+  String? loadScenesJson() => _prefs.getString(_scenesKey);
+
+  Future<void> saveLayoutJson(String json) => _prefs.setString(_layoutKey, json);
+  String? loadLayoutJson() => _prefs.getString(_layoutKey);
 }
