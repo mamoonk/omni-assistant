@@ -40,5 +40,6 @@ cd bridge && go test ./...                         # bridge
 - [x] Phase 3 — Nexus Bridge: protocol, Zigbee2MQTT manager (embedded
       broker + supervised process), inclusion wizard, mDNS discovery
       (Z-Wave manager pending hardware)
-- [ ] Phase 4 — manual IP devices, automation composer + bridge runtime
+- [x] Phase 4 — manual IP devices, automation composer, bridge automation
+      runtime (rules run 24/7 on the bridge; app engine covers the rest)
 - [ ] Phase 5 — Matter, Thread border router, polish, store launch
