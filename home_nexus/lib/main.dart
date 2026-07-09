@@ -7,6 +7,7 @@ import 'package:unification/unification.dart';
 
 import 'screens/add_device_screen.dart';
 import 'screens/automations_screen.dart';
+import 'screens/discovery_screen.dart';
 import 'screens/manual_ip_screen.dart';
 import 'screens/settings_screen.dart';
 import 'state/device_providers.dart';
@@ -263,6 +264,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: const Icon(Icons.radar),
+              title: const Text('Auto-discover'),
+              subtitle: const Text(
+                  'Scan the network for hubs, brokers, bridges & devices'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const DiscoveryScreen()));
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.hub_outlined),
               title: const Text('Zigbee / Z-Wave / Matter device'),

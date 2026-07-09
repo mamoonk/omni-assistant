@@ -1,5 +1,7 @@
 name: home_nexus
-description: "A new Flutter project."
+description: "Home Nexus: one app for every smart device on every protocol — Zigbee, Z-Wave, Matter, MQTT, HTTP — with an ambient display dashboard, scenes, automations, and voice."
+homepage: https://github.com/mamoonk/omni-assistant
+repository: https://github.com/mamoonk/omni-assistant
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -40,6 +42,7 @@ dependencies:
   window_manager: ^0.4.3
   wakelock_plus: ^1.2.8
   speech_to_text: ^7.0.0
+  multicast_dns: ^0.3.2
   flutter_staggered_grid_view: ^0.7.0
   mqtt_adapter:
     path: packages/mqtt_adapter

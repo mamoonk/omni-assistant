@@ -9,6 +9,7 @@
 ![Go](https://img.shields.io/badge/bridge-Go-00ADD8?logo=go&logoColor=white)
 ![Protocols](https://img.shields.io/badge/protocols-Zigbee%20·%20Z--Wave%20·%20Matter%20·%20MQTT%20·%20HTTP-8A2BE2)
 ![Platforms](https://img.shields.io/badge/platforms-Android%20·%20iOS%20·%20Windows%20·%20Linux%20·%20macOS-444)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 <img src="docs/dashboard.png" alt="Home Nexus ambient dashboard in kiosk mode" width="850"/>
 

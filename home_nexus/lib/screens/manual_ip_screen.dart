@@ -7,7 +7,9 @@ import '../state/manual_ip_provider.dart';
 
 /// "Generic IP Device" creator (§6.1): capability template + URL templates.
 class ManualIpScreen extends ConsumerStatefulWidget {
-  const ManualIpScreen({super.key});
+  /// Pre-fills the IP field (used by auto-discovery).
+  final String? initialIp;
+  const ManualIpScreen({super.key, this.initialIp});
 
   @override
   ConsumerState<ManualIpScreen> createState() => _ManualIpScreenState();
@@ -17,7 +19,7 @@ class _ManualIpScreenState extends ConsumerState<ManualIpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _roomCtrl = TextEditingController();
-  final _ipCtrl = TextEditingController();
+  late final _ipCtrl = TextEditingController(text: widget.initialIp ?? '');
   final _onCtrl = TextEditingController(text: 'http://{ip}/relay/0?turn=on');
   final _offCtrl = TextEditingController(text: 'http://{ip}/relay/0?turn=off');
   final _brightnessCtrl =

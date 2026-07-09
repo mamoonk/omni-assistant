@@ -1,7 +1,9 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:unification/unification.dart';
 
 import 'package:home_nexus/state/automations_provider.dart';
+import 'package:home_nexus/state/device_providers.dart';
 import 'package:home_nexus/state/scenes_provider.dart';
 
 UniversalDevice _device(String id, OriginType origin) => UniversalDevice(
@@ -79,6 +81,25 @@ void main() {
     expect(actions, hasLength(1));
     expect((actions.single as Map)['type'], 'setState');
     expect((actions.single as Map)['deviceId'], 'bridge:b0:plug');
+  });
+
+  test('empty real origin keeps demo devices; non-empty drops them', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(devicesProvider.notifier);
+    expect(container.read(devicesProvider), isNotEmpty); // mocks
+
+    // connecting to a fresh bridge with zero devices must not blank the UI
+    notifier.replaceOrigin(OriginType.nexusBridge, []);
+    expect(container.read(devicesProvider), isNotEmpty,
+        reason: 'demo devices must survive an empty origin');
+
+    // the first real device replaces the demo set
+    notifier.replaceOrigin(OriginType.nexusBridge,
+        [_device('bridge:b0:plug', OriginType.nexusBridge)]);
+    final after = container.read(devicesProvider);
+    expect(after, hasLength(1));
+    expect(after.single.id, 'bridge:b0:plug');
   });
 
   test('scene touching a non-bridge device disqualifies', () {

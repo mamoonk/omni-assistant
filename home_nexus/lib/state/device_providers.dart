@@ -59,12 +59,18 @@ class DevicesNotifier extends Notifier<List<UniversalDevice>> {
   }
 
   /// Swaps all devices of one origin, keeping other origins intact.
-  /// Demo/mock devices are dropped once any real source provides devices.
+  /// Demo/mock devices are dropped once any real source provides at least
+  /// one device — an empty source (fresh bridge) keeps the demo visible.
   void replaceOrigin(OriginType origin, List<UniversalDevice> devices) {
-    state = [
+    final real = [
       ...state.where((d) =>
           d.origin.type != origin && d.origin.connectionId != 'mock'),
       ...devices,
+    ];
+    state = [
+      if (real.isEmpty)
+        ...state.where((d) => d.origin.connectionId == 'mock'),
+      ...real,
     ];
     devices.forEach(_recordHistory);
   }
