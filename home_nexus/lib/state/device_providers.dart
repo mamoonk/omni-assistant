@@ -2,9 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
 import '../mock/mock_devices.dart';
+import 'history_provider.dart';
 
-/// Mutates capability state locally. Swapped for HomeAssistantAdapter
-/// once a real connection exists — the UI only talks to DeviceController.
+/// Mutates capability state locally. Used until a Home Assistant
+/// connection is live — the UI only ever talks to DeviceController.
 class MockDeviceController implements DeviceController {
   final Ref _ref;
   MockDeviceController(this._ref);
@@ -48,16 +49,30 @@ class DevicesNotifier extends Notifier<List<UniversalDevice>> {
     final i = state.indexWhere((d) => d.id == device.id);
     state = i < 0
         ? [...state, device]
-        : [...state]..[i] = device;
+        : ([...state]..[i] = device);
+    _recordHistory(device);
+  }
+
+  void replaceAll(List<UniversalDevice> devices) {
+    state = devices;
+    devices.forEach(_recordHistory);
+  }
+
+  void _recordHistory(UniversalDevice device) {
+    final temp = device.capabilities
+        .whereType<SensorCapability>()
+        .where((c) => c.type == CapabilityType.currentTemperature)
+        .firstOrNull;
+    final value = temp?.value;
+    if (value != null) {
+      ref.read(historyProvider.notifier).record(device.id, value);
+    }
   }
 }
 
 final devicesProvider =
     NotifierProvider<DevicesNotifier, List<UniversalDevice>>(
         DevicesNotifier.new);
-
-final controllerProvider =
-    Provider<DeviceController>((ref) => MockDeviceController(ref));
 
 /// Ordered room list derived from devices; drives dashboard tabs.
 final roomsProvider = Provider<List<String>>((ref) {

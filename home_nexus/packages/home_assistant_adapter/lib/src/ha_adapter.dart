@@ -18,6 +18,7 @@ class HomeAssistantAdapter implements DeviceController {
   int _msgId = 0;
   final _pending = <int, Completer<dynamic>>{};
   final _deviceUpdates = StreamController<UniversalDevice>.broadcast();
+  final _connectionEvents = StreamController<bool>.broadcast();
 
   /// entity_id -> area name, populated during fetchAllDevices.
   final _entityRoom = <String, String>{};
@@ -26,6 +27,10 @@ class HomeAssistantAdapter implements DeviceController {
 
   /// Real-time device state updates (already mapped to UniversalDevice).
   Stream<UniversalDevice> get deviceUpdates => _deviceUpdates.stream;
+
+  /// true after successful auth, false when the socket drops unexpectedly.
+  /// A clean disconnect() does not emit.
+  Stream<bool> get connectionEvents => _connectionEvents.stream;
 
   Future<void> connect(String url, String token) async {
     final wsUrl = url
@@ -39,11 +44,17 @@ class HomeAssistantAdapter implements DeviceController {
     _sub = _channel!.stream.listen(
       (raw) => _onMessage(jsonDecode(raw as String), token, authOk),
       onError: (Object e) {
-        if (!authOk.isCompleted) authOk.completeError(e);
+        if (!authOk.isCompleted) {
+          authOk.completeError(e);
+        } else {
+          _connectionEvents.add(false);
+        }
       },
       onDone: () {
         if (!authOk.isCompleted) {
           authOk.completeError(StateError('Connection closed during auth'));
+        } else {
+          _connectionEvents.add(false);
         }
       },
     );
@@ -53,6 +64,7 @@ class HomeAssistantAdapter implements DeviceController {
       'type': 'subscribe_events',
       'event_type': 'state_changed',
     });
+    _connectionEvents.add(true);
   }
 
   void _onMessage(

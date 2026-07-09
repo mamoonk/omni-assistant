@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
-import '../state/device_providers.dart';
+import '../state/ha_connection.dart';
+import '../state/history_provider.dart';
+import 'color_wheel.dart';
+import 'sparkline.dart';
 
 /// Picks a widget by the device's primary capability (§3.3).
 class DeviceCard extends ConsumerWidget {
@@ -48,14 +51,20 @@ class _CardShell extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   final UniversalDevice device;
   final IconData icon;
   final Widget? trailing;
   const _Header({required this.device, required this.icon, this.trailing});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final conn = ref.watch(haConnectionProvider);
+    // HA-sourced device shown while the connection is down = stale data
+    final stale = device.origin.type == OriginType.homeAssistant &&
+        device.origin.connectionId != 'mock' &&
+        conn.status != HaStatus.connected;
+
     return Row(
       children: [
         Icon(icon, size: 22),
@@ -67,6 +76,15 @@ class _Header extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
+        if (stale)
+          Tooltip(
+            message: 'Offline — showing last known state',
+            child: Icon(
+              Icons.cloud_off,
+              size: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
         ?trailing,
       ],
     );
@@ -134,28 +152,36 @@ class _LightCard extends StatelessWidget {
           if (rgb != null && on)
             Row(
               children: [
-                for (final color in const [
-                  (255, 180, 90),
-                  (255, 255, 255),
-                  (120, 190, 255),
-                  (190, 120, 255),
-                  (120, 255, 150),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: GestureDetector(
-                      onTap: () => rgb.executeCommand(controller, device,
-                          [color.$1, color.$2, color.$3]),
-                      child: CircleAvatar(
-                        radius: 11,
-                        backgroundColor: Color.fromARGB(
-                            255, color.$1, color.$2, color.$3),
-                        child: (rgb.r, rgb.g, rgb.b) == color
-                            ? const Icon(Icons.check, size: 14)
-                            : null,
-                      ),
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color.fromARGB(255, rgb.r, rgb.g, rgb.b),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
                     ),
                   ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.palette_outlined, size: 20),
+                  tooltip: 'Pick color',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () async {
+                    final color = await showColorWheelDialog(
+                      context,
+                      Color.fromARGB(255, rgb.r, rgb.g, rgb.b),
+                    );
+                    if (color != null) {
+                      await rgb.executeCommand(controller, device, [
+                        (color.r * 255).round(),
+                        (color.g * 255).round(),
+                        (color.b * 255).round(),
+                      ]);
+                    }
+                  },
+                ),
               ],
             ),
           if (brightness != null)
@@ -271,13 +297,15 @@ class _BinarySensorCard extends StatelessWidget {
   }
 }
 
-class _SensorCard extends StatelessWidget {
+class _SensorCard extends ConsumerWidget {
   final UniversalDevice device;
   const _SensorCard({required this.device});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final sensors = device.capabilities.whereType<SensorCapability>();
+    final history = ref.watch(historyProvider)[device.id] ?? const <num>[];
+
     return _CardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,6 +320,11 @@ class _SensorCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium),
             ],
           ),
+          if (history.length >= 2)
+            Sparkline(
+              values: history,
+              color: Theme.of(context).colorScheme.primary,
+            ),
         ],
       ),
     );
