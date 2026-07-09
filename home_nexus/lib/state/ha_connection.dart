@@ -10,8 +10,10 @@ import '../mock/mock_devices.dart';
 import '../services/local_store.dart';
 import 'bridge_connection.dart';
 import 'device_providers.dart';
+import 'automations_provider.dart';
 import 'history_provider.dart';
 import 'layout_provider.dart';
+import 'manual_ip_provider.dart';
 import 'mqtt_connection.dart';
 import 'scenes_provider.dart';
 
@@ -177,7 +179,7 @@ class RoutingController implements DeviceController {
       OriginType.mqtt => _ref.read(mqttConnectionProvider.notifier).adapter,
       OriginType.nexusBridge =>
         _ref.read(bridgeConnectionProvider.notifier).adapter,
-      _ => null,
+      OriginType.manualIp => _ref.read(manualIpControllerProvider),
     };
     if (adapter == null) {
       // offline: leave state untouched; card badge already shows staleness
@@ -201,6 +203,9 @@ final bootstrapProvider = FutureProvider<void>((ref) async {
 
   ref.read(scenesProvider.notifier).load(store.loadScenesJson());
   ref.read(layoutProvider.notifier).load(store.loadLayoutJson());
+  ref.read(manualIpProvider.notifier).load(store.loadManualDevicesJson());
+  ref.read(automationsProvider.notifier).load(store.loadAutomationsJson());
+  AutomationEngine.attach(ref);
 
   final cached = store.loadDevices();
   if (cached.isNotEmpty) {

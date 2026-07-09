@@ -70,6 +70,8 @@ class LocalStore {
   static const _devicesKey = 'device_cache';
   static const _scenesKey = 'scenes';
   static const _layoutKey = 'layout';
+  static const _manualDevicesKey = 'manual_devices';
+  static const _automationsKey = 'automations';
 
   final SharedPreferences _prefs;
   LocalStore(this._prefs);
@@ -128,4 +130,12 @@ class LocalStore {
 
   Future<void> saveLayoutJson(String json) => _prefs.setString(_layoutKey, json);
   String? loadLayoutJson() => _prefs.getString(_layoutKey);
+
+  Future<void> saveManualDevicesJson(String json) =>
+      _prefs.setString(_manualDevicesKey, json);
+  String? loadManualDevicesJson() => _prefs.getString(_manualDevicesKey);
+
+  Future<void> saveAutomationsJson(String json) =>
+      _prefs.setString(_automationsKey, json);
+  String? loadAutomationsJson() => _prefs.getString(_automationsKey);
 }

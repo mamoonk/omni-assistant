@@ -6,6 +6,8 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:unification/unification.dart';
 
 import 'screens/add_device_screen.dart';
+import 'screens/automations_screen.dart';
+import 'screens/manual_ip_screen.dart';
 import 'screens/settings_screen.dart';
 import 'state/device_providers.dart';
 import 'state/ha_connection.dart';
@@ -90,8 +92,13 @@ class DashboardScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.add),
               tooltip: 'Add device',
+              onPressed: () => _pickAddFlow(context),
+            ),
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: 'Automations',
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddDeviceScreen()),
+                MaterialPageRoute(builder: (_) => const AutomationsScreen()),
               ),
             ),
             if (editing)
@@ -148,6 +155,39 @@ class DashboardScreen extends ConsumerWidget {
               child: TabBarView(
                 children: [for (final tab in tabs) _DeviceGrid(tab: tab)],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _pickAddFlow(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.hub_outlined),
+              title: const Text('Zigbee / Z-Wave device'),
+              subtitle: const Text('Guided inclusion via Nexus Bridge'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AddDeviceScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: const Text('Generic IP device'),
+              subtitle: const Text('HTTP switch, light, or sensor'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ManualIpScreen()));
+              },
             ),
           ],
         ),
