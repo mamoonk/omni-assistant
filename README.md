@@ -92,6 +92,16 @@ Wi-Fi relay and a Home Assistant light in a single rule.
 
 ## 🚀 Quick start
 
+**Windows — one command:**
+
+```bat
+start.bat            :: builds what's missing, launches bridge (demo) + app
+start.bat zigbee     :: bridge with the real Zigbee2MQTT manager
+start.bat app        :: app only
+```
+
+**Manual (any OS):**
+
 ```sh
 # 1 — the app
 cd home_nexus && flutter run
@@ -101,8 +111,7 @@ cd bridge && go run . -demo
 # note the pairing token printed in the log
 
 # 3 — in the app
-#    Settings → Nexus Bridge → Search network → enter token → Connect
-#    then hit ＋ to run the inclusion wizard 🎉
+#    ＋ → Auto-discover → Set up → enter the pairing token 🎉
 ```
 
 Real radios: see [`bridge/README.md`](bridge/README.md) for Zigbee2MQTT
