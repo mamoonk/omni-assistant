@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:unification/unification.dart';
 
+import 'screens/add_device_screen.dart';
 import 'screens/settings_screen.dart';
 import 'state/device_providers.dart';
 import 'state/ha_connection.dart';
@@ -86,6 +87,13 @@ class DashboardScreen extends ConsumerWidget {
           title: const Text('Home Nexus'),
           actions: [
             const _ConnectionIndicator(),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Add device',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AddDeviceScreen()),
+              ),
+            ),
             if (editing)
               IconButton(
                 icon: const Icon(Icons.tab),

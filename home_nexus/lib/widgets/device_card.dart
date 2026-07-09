@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
+import '../state/bridge_connection.dart';
 import '../state/ha_connection.dart';
 import '../state/history_provider.dart';
 import '../state/mqtt_connection.dart';
@@ -64,6 +65,7 @@ class _Header extends ConsumerWidget {
     final status = switch (device.origin.type) {
       OriginType.homeAssistant => ref.watch(haConnectionProvider).status,
       OriginType.mqtt => ref.watch(mqttConnectionProvider).status,
+      OriginType.nexusBridge => ref.watch(bridgeConnectionProvider).status,
       _ => HaStatus.connected,
     };
     final stale = device.origin.connectionId != 'mock' &&

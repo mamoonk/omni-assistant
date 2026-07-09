@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(winget install --id GoLang.Go -e --accept-source-agreements --accept-package-agreements --silent)",
+      "PowerShell($env:Path += ';C:\\\\Program Files\\\\Go\\\\bin'; Set-Location \"C:\\\\smagents\\\\Digital Turine\\\\skynet\\\\bridge\"; go test ./...; if \\($?\\) { go build -o nexus-bridge.exe . })"
+    ]
+  }
+}

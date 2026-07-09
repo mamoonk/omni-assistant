@@ -8,6 +8,7 @@ import 'package:unification/unification.dart';
 
 import '../mock/mock_devices.dart';
 import '../services/local_store.dart';
+import 'bridge_connection.dart';
 import 'device_providers.dart';
 import 'history_provider.dart';
 import 'layout_provider.dart';
@@ -174,6 +175,8 @@ class RoutingController implements DeviceController {
       OriginType.homeAssistant =>
         _ref.read(haConnectionProvider.notifier).adapter,
       OriginType.mqtt => _ref.read(mqttConnectionProvider.notifier).adapter,
+      OriginType.nexusBridge =>
+        _ref.read(bridgeConnectionProvider.notifier).adapter,
       _ => null,
     };
     if (adapter == null) {
@@ -185,9 +188,10 @@ class RoutingController implements DeviceController {
 }
 
 final controllerProvider = Provider<DeviceController>((ref) {
-  // rebuild routing when either connection changes
+  // rebuild routing when any connection changes
   ref.watch(haConnectionProvider);
   ref.watch(mqttConnectionProvider);
+  ref.watch(bridgeConnectionProvider);
   return RoutingController(ref);
 });
 
@@ -216,6 +220,12 @@ final bootstrapProvider = FutureProvider<void>((ref) async {
     unawaited(ref
         .read(mqttConnectionProvider.notifier)
         .connect(mqttConfig, save: false));
+  }
+  final bridgeConfig = store.loadBridgeConfig();
+  if (bridgeConfig != null) {
+    unawaited(ref
+        .read(bridgeConnectionProvider.notifier)
+        .connect(bridgeConfig, save: false));
   }
 });
 

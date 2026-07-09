@@ -32,12 +32,12 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
     expect(find.byType(SettingsScreen), findsOneWidget);
-    expect(find.text('MQTT broker (Zigbee2MQTT)'), findsOneWidget);
+    expect(find.text('Nexus Bridge'), findsOneWidget);
 
-    // empty token -> validation error, no connect attempt
+    // first section is the bridge; empty host -> validation error
     await tester.tap(find.text('Connect').first);
     await tester.pumpAndSettle();
-    expect(find.text('Token required'), findsOneWidget);
+    expect(find.text('Host required'), findsOneWidget);
   });
 
   testWidgets('edit mode shows scene chip and new-tab action', (tester) async {

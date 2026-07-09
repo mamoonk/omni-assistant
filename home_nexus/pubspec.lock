@@ -206,6 +206,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "10.11.11"
+  nexus_bridge_adapter:
+    dependency: "direct main"
+    description:
+      path: "packages/nexus_bridge_adapter"
+      relative: true
+    source: path
+    version: "0.1.0"
   path:
     dependency: transitive
     description:

@@ -35,6 +35,20 @@ class MqttConfig {
       );
 }
 
+class BridgeConfig {
+  final String host;
+  final int port;
+
+  const BridgeConfig({required this.host, this.port = 8927});
+
+  Map<String, dynamic> toJson() => {'host': host, 'port': port};
+
+  factory BridgeConfig.fromJson(Map<String, dynamic> json) => BridgeConfig(
+        host: json['host'] as String,
+        port: json['port'] as int? ?? 8927,
+      );
+}
+
 class HaConfig {
   final String url;
   final String token;
@@ -52,6 +66,7 @@ class HaConfig {
 class LocalStore {
   static const _configKey = 'ha_config';
   static const _mqttConfigKey = 'mqtt_config';
+  static const _bridgeConfigKey = 'bridge_config';
   static const _devicesKey = 'device_cache';
   static const _scenesKey = 'scenes';
   static const _layoutKey = 'layout';
@@ -95,6 +110,18 @@ class LocalStore {
   }
 
   Future<void> clearMqttConfig() => _prefs.remove(_mqttConfigKey);
+
+  Future<void> saveBridgeConfig(BridgeConfig config) =>
+      _prefs.setString(_bridgeConfigKey, jsonEncode(config.toJson()));
+
+  BridgeConfig? loadBridgeConfig() {
+    final raw = _prefs.getString(_bridgeConfigKey);
+    if (raw == null) return null;
+    return BridgeConfig.fromJson(
+        (jsonDecode(raw) as Map).cast<String, dynamic>());
+  }
+
+  Future<void> clearBridgeConfig() => _prefs.remove(_bridgeConfigKey);
 
   Future<void> saveScenesJson(String json) => _prefs.setString(_scenesKey, json);
   String? loadScenesJson() => _prefs.getString(_scenesKey);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/local_store.dart';
+import '../state/bridge_connection.dart';
 import '../state/ha_connection.dart';
 import '../state/mqtt_connection.dart';
 
@@ -15,11 +16,122 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
+          _BridgeSection(),
+          SizedBox(height: 24),
           _HaSection(),
           SizedBox(height: 24),
           _MqttSection(),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nexus Bridge
+// ---------------------------------------------------------------------------
+
+class _BridgeSection extends ConsumerStatefulWidget {
+  const _BridgeSection();
+
+  @override
+  ConsumerState<_BridgeSection> createState() => _BridgeSectionState();
+}
+
+class _BridgeSectionState extends ConsumerState<_BridgeSection> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _hostCtrl;
+  late final TextEditingController _portCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = ref.read(bridgeConnectionProvider).config;
+    _hostCtrl = TextEditingController(text: config?.host ?? '');
+    _portCtrl = TextEditingController(text: '${config?.port ?? 8927}');
+  }
+
+  @override
+  void dispose() {
+    _hostCtrl.dispose();
+    _portCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conn = ref.watch(bridgeConnectionProvider);
+    final busy = conn.status == HaStatus.connecting;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Nexus Bridge', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 4),
+        Text(
+          conn.info != null
+              ? '${conn.info!.name} v${conn.info!.version} — '
+                  '${conn.info!.protocols.join(', ')}'
+              : 'Companion service for direct Zigbee/Z-Wave control',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        _StatusBanner(
+            status: conn.status, error: conn.error, attempt: conn.attempt),
+        const SizedBox(height: 12),
+        Form(
+          key: _formKey,
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  controller: _hostCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Host',
+                    hintText: '192.168.1.20',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Host required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: _portCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Port',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (v) =>
+                      int.tryParse(v ?? '') == null ? 'Invalid' : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _ConnectButtons(
+          busy: busy,
+          connected: conn.status == HaStatus.connected ||
+              conn.status == HaStatus.reconnecting,
+          hasConfig: conn.config != null,
+          onConnect: () {
+            if (!_formKey.currentState!.validate()) return;
+            ref.read(bridgeConnectionProvider.notifier).connect(BridgeConfig(
+                  host: _hostCtrl.text.trim(),
+                  port: int.parse(_portCtrl.text.trim()),
+                ));
+          },
+          onDisconnect: () =>
+              ref.read(bridgeConnectionProvider.notifier).disconnect(),
+          onForget: () => ref
+              .read(bridgeConnectionProvider.notifier)
+              .disconnect(forget: true),
+        ),
+      ],
     );
   }
 }
