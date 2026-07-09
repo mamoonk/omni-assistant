@@ -6,8 +6,10 @@ import 'package:nexus_bridge_adapter/nexus_bridge_adapter.dart';
 import 'package:unification/unification.dart';
 
 import '../services/local_store.dart';
+import 'automations_provider.dart';
 import 'device_providers.dart';
 import 'ha_connection.dart' show HaStatus, localStoreProvider;
+import 'scenes_provider.dart';
 
 class BridgeConnectionState {
   final HaStatus status;
@@ -56,7 +58,29 @@ class BridgeConnectionNotifier extends Notifier<BridgeConnectionState> {
       _saveTimer?.cancel();
       _teardown();
     });
+    // rule set changed -> re-sync the bridge's 24/7 runner
+    ref.listen<List<Automation>>(automationsProvider, (_, _) {
+      unawaited(syncAutomations());
+    });
     return const BridgeConnectionState();
+  }
+
+  /// Pushes all bridge-runnable automations (scenes flattened) to the bridge.
+  Future<void> syncAutomations() async {
+    final a = adapter;
+    if (a == null || state.status != HaStatus.connected) return;
+    final devices = ref.read(devicesProvider);
+    final scenes = ref.read(scenesProvider);
+    final runnable = [
+      for (final automation in ref.read(automationsProvider))
+        if (isBridgeRunnable(automation, devices, scenes))
+          bridgeAutomationJson(automation, scenes),
+    ];
+    try {
+      await a.syncAutomations(runnable);
+    } catch (_) {
+      // bridge briefly unreachable: next connect/change re-syncs
+    }
   }
 
   Future<void> connect(BridgeConfig config, {bool save = true}) async {
@@ -89,6 +113,7 @@ class BridgeConnectionNotifier extends Notifier<BridgeConnectionState> {
 
       state = state.copyWith(
           status: HaStatus.connected, info: info, attempt: 0, clearError: true);
+      unawaited(syncAutomations());
     } catch (e) {
       await _teardown();
       state = state.copyWith(status: HaStatus.error, error: '$e');

@@ -157,6 +157,10 @@ func applyCommand(cap *device.Capability, value any) {
 		}
 	case device.CapTargetTemperature:
 		cap.State["target"] = value
+	// demo-only: binary sensors are commandable so tests and the app can
+	// simulate motion/contact without hardware
+	case device.CapMotion, device.CapContact:
+		cap.State["active"] = value == true
 	}
 }
 

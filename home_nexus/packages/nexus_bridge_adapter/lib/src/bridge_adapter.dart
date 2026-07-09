@@ -154,6 +154,10 @@ class NexusBridgeAdapter implements DeviceController {
   Future<void> permitJoin({String protocol = 'zigbee', int duration = 60}) =>
       _request(protocol, 'permit_join', {'duration': duration});
 
+  /// Replaces the bridge's 24/7 automation rule set (§6.2).
+  Future<void> syncAutomations(List<Map<String, dynamic>> automations) =>
+      _request('automation', 'sync', {'automations': automations});
+
   @override
   Future<void> sendCommand(
     UniversalDevice device,

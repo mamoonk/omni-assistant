@@ -8,7 +8,10 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-var bucketDevices = []byte("devices")
+var (
+	bucketDevices     = []byte("devices")
+	bucketAutomations = []byte("automations")
+)
 
 type Store struct {
 	db *bolt.DB
@@ -20,7 +23,10 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketDevices)
+		if _, err := tx.CreateBucketIfNotExists(bucketDevices); err != nil {
+			return err
+		}
+		_, err := tx.CreateBucketIfNotExists(bucketAutomations)
 		return err
 	})
 	if err != nil {
@@ -46,6 +52,24 @@ func (s *Store) DeleteDevice(id string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucketDevices).Delete([]byte(id))
 	})
+}
+
+// ReplaceAutomationsJSON stores the full synced rule set as one blob.
+func (s *Store) ReplaceAutomationsJSON(raw []byte) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketAutomations).Put([]byte("all"), raw)
+	})
+}
+
+func (s *Store) AutomationsJSON() ([]byte, error) {
+	var raw []byte
+	err := s.db.View(func(tx *bolt.Tx) error {
+		if v := tx.Bucket(bucketAutomations).Get([]byte("all")); v != nil {
+			raw = append([]byte(nil), v...)
+		}
+		return nil
+	})
+	return raw, err
 }
 
 func (s *Store) Devices() ([]device.Device, error) {

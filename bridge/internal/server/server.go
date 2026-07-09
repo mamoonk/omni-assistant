@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mamoonk/omni-assistant/bridge/internal/automation"
 	"github.com/mamoonk/omni-assistant/bridge/internal/device"
 	"github.com/mamoonk/omni-assistant/bridge/internal/manager"
 	"github.com/mamoonk/omni-assistant/bridge/internal/protocol"
@@ -27,6 +29,7 @@ type Server struct {
 	Name     string
 	store    *store.Store
 	managers map[string]manager.RadioManager // by protocol domain
+	engine   *automation.Engine
 
 	mu      sync.Mutex
 	clients map[*client]struct{}
@@ -42,12 +45,42 @@ func New(name string, st *store.Store, managers ...manager.RadioManager) *Server
 	for _, m := range managers {
 		byDomain[m.Protocol()] = m
 	}
-	return &Server{
+	s := &Server{
 		Name:     name,
 		store:    st,
 		managers: byDomain,
 		clients:  map[*client]struct{}{},
 	}
+	s.engine = automation.NewEngine(s.executeOnAnyManager)
+	s.engine.OnFired = func(a automation.Automation) {
+		s.broadcast(protocol.NewEvent("automation", "automation_fired",
+			map[string]any{"id": a.ID, "name": a.Name}))
+	}
+	// restore synced rules across restarts
+	if raw, err := st.AutomationsJSON(); err == nil && raw != nil {
+		var rules []automation.Automation
+		if json.Unmarshal(raw, &rules) == nil {
+			s.engine.SetAutomations(rules, s.allDevices())
+		}
+	}
+	return s
+}
+
+func (s *Server) executeOnAnyManager(deviceID, capability string, value any) error {
+	for _, m := range s.managers {
+		if err := m.Execute(deviceID, capability, value); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("no manager accepted device %s", deviceID)
+}
+
+func (s *Server) allDevices() []device.Device {
+	var all []device.Device
+	for _, m := range s.managers {
+		all = append(all, m.Devices()...)
+	}
+	return all
 }
 
 // Run starts radio managers, fans their events out to clients, and persists
@@ -59,6 +92,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		go s.pumpEvents(ctx, m)
 	}
+	go s.runClock(ctx)
 	<-ctx.Done()
 	for _, m := range s.managers {
 		_ = m.Stop()
@@ -73,6 +107,7 @@ func (s *Server) pumpEvents(ctx context.Context, m manager.RadioManager) {
 			return
 		case e := <-m.Events():
 			s.persistFromEvent(e)
+			s.feedEngine(e)
 			s.broadcast(e)
 		}
 	}
@@ -97,6 +132,33 @@ func (s *Server) persistFromEvent(e protocol.Event) {
 	}
 	if err := s.store.SaveDevice(d); err != nil {
 		log.Printf("store: %v", err)
+	}
+}
+
+func (s *Server) runClock(ctx context.Context) {
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.engine.Tick(now)
+		}
+	}
+}
+
+// feedEngine forwards state transitions to the automation engine.
+func (s *Server) feedEngine(e protocol.Event) {
+	if e.Event != protocol.EvStateChanged {
+		return
+	}
+	data, ok := e.Data.(map[string]any)
+	if !ok {
+		return
+	}
+	if d, ok := data["device"].(device.Device); ok {
+		s.engine.OnStateChanged(d)
 	}
 }
 
@@ -158,6 +220,8 @@ func (s *Server) Dispatch(cmd protocol.Command) protocol.Result {
 		return s.dispatchBridge(cmd)
 	case "device":
 		return s.dispatchDevice(cmd)
+	case "automation":
+		return s.dispatchAutomation(cmd)
 	default:
 		if m, ok := s.managers[cmd.Domain]; ok {
 			return s.dispatchRadio(m, cmd)
@@ -203,12 +267,35 @@ func (s *Server) dispatchDevice(cmd protocol.Command) protocol.Result {
 		if err := json.Unmarshal(cmd.Params, &p); err != nil {
 			return protocol.Fail(cmd.ID, err)
 		}
-		for _, m := range s.managers {
-			if err := m.Execute(p.DeviceID, p.Capability, p.Value); err == nil {
-				return protocol.OK(cmd.ID, nil)
-			}
+		if err := s.executeOnAnyManager(p.DeviceID, p.Capability, p.Value); err != nil {
+			return protocol.Fail(cmd.ID, err)
 		}
-		return protocol.Fail(cmd.ID, fmt.Errorf("no manager accepted device %s", p.DeviceID))
+		return protocol.OK(cmd.ID, nil)
+
+	default:
+		return protocol.Fail(cmd.ID, fmt.Errorf("unknown action %q", cmd.Action))
+	}
+}
+
+func (s *Server) dispatchAutomation(cmd protocol.Command) protocol.Result {
+	switch cmd.Action {
+	case "sync":
+		var p struct {
+			Automations []automation.Automation `json:"automations"`
+		}
+		if err := json.Unmarshal(cmd.Params, &p); err != nil {
+			return protocol.Fail(cmd.ID, err)
+		}
+		s.engine.SetAutomations(p.Automations, s.allDevices())
+		raw, _ := json.Marshal(p.Automations)
+		if err := s.store.ReplaceAutomationsJSON(raw); err != nil {
+			return protocol.Fail(cmd.ID, err)
+		}
+		return protocol.OK(cmd.ID, map[string]any{"count": len(p.Automations)})
+
+	case "list":
+		return protocol.OK(cmd.ID,
+			map[string]any{"automations": s.engine.Automations()})
 
 	default:
 		return protocol.Fail(cmd.ID, fmt.Errorf("unknown action %q", cmd.Action))

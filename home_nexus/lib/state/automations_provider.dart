@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unification/unification.dart';
 
+import 'bridge_connection.dart';
 import 'device_providers.dart';
-import 'ha_connection.dart' show controllerProvider, localStoreProvider;
+import 'ha_connection.dart'
+    show HaStatus, controllerProvider, localStoreProvider;
 import 'scenes_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -221,6 +223,66 @@ bool compareValues(dynamic state, String op, dynamic target) {
 }
 
 // ---------------------------------------------------------------------------
+// Bridge handoff (§6.2): rules whose trigger and actions all live on
+// bridge-origin devices run on the Nexus Bridge 24/7; the app engine skips
+// them while the bridge is connected.
+// ---------------------------------------------------------------------------
+
+bool _isBridgeDevice(String deviceId, List<UniversalDevice> devices) =>
+    devices.any(
+        (d) => d.id == deviceId && d.origin.type == OriginType.nexusBridge);
+
+/// Expands runScene actions into their captured setState actions.
+List<SetStateAction>? _flattenActions(
+    Automation automation, List<Scene> scenes) {
+  final out = <SetStateAction>[];
+  for (final action in automation.actions) {
+    switch (action) {
+      case SetStateAction a:
+        out.add(a);
+      case RunSceneAction(:final sceneId):
+        final scene = scenes.where((s) => s.id == sceneId).firstOrNull;
+        if (scene == null) return null;
+        out.addAll([
+          for (final sa in scene.actions)
+            SetStateAction(
+              deviceId: sa.deviceId,
+              capabilityType: sa.capabilityType,
+              value: sa.value,
+            ),
+        ]);
+    }
+  }
+  return out;
+}
+
+bool isBridgeRunnable(
+    Automation automation, List<UniversalDevice> devices, List<Scene> scenes) {
+  final trigger = automation.trigger;
+  if (trigger is DeviceTrigger &&
+      !_isBridgeDevice(trigger.deviceId, devices)) {
+    return false;
+  }
+  final flat = _flattenActions(automation, scenes);
+  if (flat == null || flat.isEmpty) return false;
+  return flat.every((a) => _isBridgeDevice(a.deviceId, devices));
+}
+
+/// Bridge-protocol JSON for one runnable automation (scenes flattened).
+Map<String, dynamic> bridgeAutomationJson(
+    Automation automation, List<Scene> scenes) {
+  final flat = _flattenActions(automation, scenes) ?? const [];
+  return {
+    'id': automation.id,
+    'name': automation.name,
+    'enabled': automation.enabled,
+    'trigger': automation.trigger.toJson(),
+    'condition': automation.condition?.toJson(),
+    'actions': [for (final a in flat) a.toJson()],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -303,7 +365,7 @@ class AutomationEngine {
     final nextById = {for (final d in next) d.id: d};
 
     for (final automation in _ref.read(automationsProvider)) {
-      if (!automation.enabled) continue;
+      if (!automation.enabled || _bridgeHandles(automation)) continue;
       final trigger = automation.trigger;
       if (trigger is! DeviceTrigger) continue;
 
@@ -316,12 +378,12 @@ class AutomationEngine {
   }
 
   void onTick(DateTime now) {
-    final minuteKey = '${now.hour}:${now.minute}';
+    final minuteKey = '${now.year}-${now.month}-${now.day}T${now.hour}:${now.minute}';
     if (minuteKey == _lastFiredMinute) return;
     _lastFiredMinute = minuteKey;
 
     for (final automation in _ref.read(automationsProvider)) {
-      if (!automation.enabled) continue;
+      if (!automation.enabled || _bridgeHandles(automation)) continue;
       final trigger = automation.trigger;
       if (trigger is TimeTrigger &&
           trigger.hour == now.hour &&
@@ -330,6 +392,16 @@ class AutomationEngine {
         _runActions(automation);
       }
     }
+  }
+
+  /// True when the bridge is connected and runs this rule itself —
+  /// the app engine must not double-fire it.
+  bool _bridgeHandles(Automation automation) {
+    if (_ref.read(bridgeConnectionProvider).status != HaStatus.connected) {
+      return false;
+    }
+    return isBridgeRunnable(
+        automation, _ref.read(devicesProvider), _ref.read(scenesProvider));
   }
 
   bool _conditionHolds(Automation automation, DateTime now) {
